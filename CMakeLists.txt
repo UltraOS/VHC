@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.6)
-project (vhc)
-add_executable(VHC src/Application.cpp src/Utility.h)
+project (VHC)
+file(GLOB VHC_SOURCES "src/*.h" "src/*.cpp")
+add_executable(VHC ${VHC_SOURCES})
 set_target_properties(VHC PROPERTIES OUTPUT_NAME "vhc")
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT VHC)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <stdexcept>
 #include <vector>
 #include <unordered_map>
@@ -288,3 +289,20 @@ private:
         }
     }
 };
+
+inline std::string construct_path(const std::string& l, const std::string& r)
+{
+    char slash = l.find('\\') == std::string::npos ? '/' : '\\';
+
+    bool l_slash = l.back()  == '/' || l.back()  == '\\';
+    bool r_slash = r.front() == '/' || r.front() == '\\';
+
+    if (l_slash && r_slash)
+        return l + std::string(r, 1);
+    else if (l_slash && !r_slash)
+        return l + r;
+    else if (!l_slash && r_slash)
+        return l + r;
+    else
+        return l + slash + r;
+}
