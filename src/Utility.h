@@ -1,5 +1,10 @@
 #pragma once
 
+#ifdef _MSVC_LANG
+    // No, i'm not gonna use fopen_s
+    #define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -306,3 +311,19 @@ inline std::string construct_path(const std::string& l, const std::string& r)
     else
         return l + slash + r;
 }
+
+struct disk_geometry
+{
+    size_t total_sector_count;
+    size_t cylinders;
+    size_t heads;
+    size_t sectors;
+};
+
+#define KB 1024
+#define MB 1024 * KB
+#define GB 1024 * MB
+
+#define WRITE_EXACTLY(file, data, size) \
+    if (!fwrite(data, sizeof(uint8_t), size, file)) \
+        throw std::runtime_error("Failed to write " + std::to_string(size) + " bytes to file")
