@@ -107,12 +107,10 @@ void VMDKDiskImage::write_description(const std::string& image_name, const std::
 disk_geometry VMDKDiskImage::calculate_geometry(size_t size_in_bytes)
 {
     constexpr size_t vmdk_byte_limit = 8455200768;
+    constexpr size_t vmdk_cylinder_count_limit = 16383;
     constexpr size_t vmdk_ide_heads = 16;
     constexpr size_t vmdk_ide_sectors = 63;
     constexpr size_t vmdk_ide_combined = vmdk_ide_heads * vmdk_ide_sectors;
-
-    if (size_in_bytes > vmdk_byte_limit)
-        throw std::runtime_error("VMDK disk byte limit is 8455200768 bytes.");
 
     if (size_in_bytes % 512)
         throw std::runtime_error("Disk size must be aligned to 512 bytes");
@@ -122,6 +120,9 @@ disk_geometry VMDKDiskImage::calculate_geometry(size_t size_in_bytes)
     dg.heads = vmdk_ide_heads;
     dg.sectors = vmdk_ide_sectors;
     dg.cylinders = dg.total_sector_count / vmdk_ide_combined;
+
+    if (dg.cylinders > vmdk_cylinder_count_limit)
+        dg.cylinders = vmdk_cylinder_count_limit;
 
     return dg;
 }

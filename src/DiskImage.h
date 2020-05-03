@@ -6,9 +6,9 @@
 
 class DiskImage
 {
-protected:
-    static constexpr size_t sector_size = 512;
 public:
+    static constexpr size_t sector_size = 512;
+
     virtual void write(uint8_t* data, size_t size) = 0;
 
     virtual void finalize() = 0;

@@ -318,12 +318,46 @@ struct disk_geometry
     size_t cylinders;
     size_t heads;
     size_t sectors;
+
+    bool over_chs_limit() const noexcept
+    {
+        if (heads > ((1 << 8) - 1))
+            return true;
+        if (sectors > ((1 << 6) - 1))
+            return true;
+        if (cylinders > ((1 << 10) - 1))
+            return true;
+
+        return false;
+    }
 };
+
+struct CHS
+{
+    size_t cylinder;
+    size_t head;
+    size_t sector;
+};
+
+inline CHS to_chs(size_t lba, const disk_geometry& geometry)
+{
+    CHS chs;
+
+    chs.head = (lba / geometry.sectors) % geometry.heads;
+    chs.cylinder = (lba / geometry.sectors) / geometry.heads;
+    chs.sector = (lba % geometry.sectors) + 1;
+
+    return chs;
+}
 
 #define KB 1024
 #define MB 1024 * KB
 #define GB 1024 * MB
 
 #define WRITE_EXACTLY(file, data, size) \
-    if (!fwrite(data, sizeof(uint8_t), size, file)) \
+    if (fwrite(data, sizeof(uint8_t), size, file) != size) \
+        throw std::runtime_error("Failed to write " + std::to_string(size) + " bytes to file")
+
+#define READ_EXACTLY(file, data, size) \
+    if (fread(data, sizeof(uint8_t), size, file) != size) \
         throw std::runtime_error("Failed to write " + std::to_string(size) + " bytes to file")
