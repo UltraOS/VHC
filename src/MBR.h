@@ -3,7 +3,7 @@
 #include <vector>
 
 #include "Utility.h"
-#include "DiskImage.h"
+#include "DiskImages/DiskImage.h"
 
 class MBR
 {
@@ -35,7 +35,7 @@ public:
 
         uint32_t sector_count() const noexcept;
 
-        void serialize(uint8_t* into, const disk_geometry& geometry, size_t lba_offset) const noexcept;
+        void serialize(uint8_t* into, const disk_geometry& geometry, size_t lba_offset) const;
     };
 
 private:
@@ -53,7 +53,7 @@ public:
 
     void write_into(DiskImage& image);
 
-    void add_partition(const Partition& partition);
+    size_t add_partition(const Partition& partition);
 private:
-    bool validate_mbr();
+    void validate_mbr();
 };

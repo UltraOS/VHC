@@ -1,8 +1,9 @@
 #include <iostream>
 
-#include "VMDKDiskImage.h"
-#include "MBR.h"
 #include "Utility.h"
+#include "FileSystems/FAT32.h"
+#include "DiskImages/VMDKDiskImage.h"
+#include "MBR.h"
 
 int main(int argc, char** argv)
 {
@@ -10,7 +11,7 @@ int main(int argc, char** argv)
     args.add_param("mbr", 'm', "Path to an MBR (Master Boot Record)", false)
         .add_param("vbr", 'v', "Path to a VBR (Volume Boot Record)", false)
         .add_list("files", 'f', "Paths to files to be put on disk")
-        .add_param("size", 's', "Hard drive size to be generated (in megabytes)", false)
+        .add_param("size", 's', "Hard disk size to be generated (in megabytes)", false)
         .add_param("image-dir", 'i', "Path to a directory to output image files", false)
         .add_param("image-name", 'n', "Name of the image to be generated", false)
         .add_help("help", 'h', "Display this menu and exit",
@@ -34,18 +35,20 @@ int main(int argc, char** argv)
         // the -1 being the MBR size
         MBR::Partition partition_1(image_sector_count - 1);
 
-        mbr.add_partition(partition_1);
+        auto partition_offset = mbr.add_partition(partition_1);
 
         mbr.write_into(image);
 
-        // TODO:
-        // FAT32 data(lba_offset, lba_size, vbr)
-        // data.add_file(...)
-        // data.write_into(image)
+        FAT32 data(args.get("vbr"), partition_offset, partition_1.sector_count());
+
+        for (const auto& file : args.get_list("files"))
+            data.add_file(file);
+
+        data.write_into(image);
 
         image.finalize();
     }
-    catch (const std::exception & ex)
+    catch (const std::exception& ex)
     {
         std::cout << "ERROR: " << ex.what() << std::endl;
         return 1;

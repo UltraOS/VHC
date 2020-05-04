@@ -1,14 +1,14 @@
 #include "MBR.h"
 
 MBR::Partition::Partition(size_t sector_count, MBR::Partition::status s, MBR::Partition::type t)
-    : m_status(s), m_type(t), m_sector_count(sector_count)
+    : m_status(s), m_type(t), m_sector_count(static_cast<uint32_t>(sector_count))
 {
 
 }
 
-void MBR::Partition::serialize(uint8_t* into, const disk_geometry& geometry, size_t lba_offset) const noexcept
+void MBR::Partition::serialize(uint8_t* into, const disk_geometry& geometry, size_t lba_offset) const
 {
-    if (m_type == Partition::type::FAT32_CHS)
+    if (m_type == Partition::type::FAT32_CHS || geometry.within_chs_limit())
     {
         auto chs_begin = to_chs(lba_offset, geometry);
         auto chs_end = to_chs(lba_offset, geometry);
@@ -22,8 +22,8 @@ void MBR::Partition::serialize(uint8_t* into, const disk_geometry& geometry, siz
 
         // CC SSSSSS
         // 00 000000
-        uint8_t sector_cylinder_begin = chs_begin.sector;
-        uint8_t sector_cylinder_end = chs_end.sector;
+        uint8_t sector_cylinder_begin = static_cast<uint8_t>(chs_begin.sector);
+        uint8_t sector_cylinder_end = static_cast<uint8_t>(chs_end.sector);
 
         sector_cylinder_begin |= chs_begin.cylinder & 0b1100000000;
         sector_cylinder_end   |= chs_end.cylinder   & 0b1100000000;
@@ -31,19 +31,15 @@ void MBR::Partition::serialize(uint8_t* into, const disk_geometry& geometry, siz
         uint8_t cylinder_begin = chs_begin.cylinder & 0b0011111111;
         uint8_t cylinder_end   = chs_end.cylinder   & 0b0011111111;
 
-        into[1] = chs_begin.head;
+        into[1] = static_cast<uint8_t>(chs_begin.head);
         into[2] = sector_cylinder_begin;
         into[3] = cylinder_begin;
-        into[5] = chs_end.head;
+        into[5] = static_cast<uint8_t>(chs_end.head);
         into[6] = sector_cylinder_end;
         into[7] = cylinder_end;
     }
     else if (m_type == Partition::type::FAT32_LBA)
     {
-        // these should technically
-        // be set to the actual values
-        // if the partition size is under 8GB
-        // but we don't really care (for now)
         into[1] = 0xFF;
         into[2] = 0xFF;
         into[3] = 0xFF;
@@ -55,8 +51,8 @@ void MBR::Partition::serialize(uint8_t* into, const disk_geometry& geometry, siz
     into[0] = static_cast<uint8_t>(m_status);
     into[4] = static_cast<uint8_t>(m_type);
 
-    *reinterpret_cast<uint32_t*>(&into[8]) = lba_offset;
-    *reinterpret_cast<uint32_t*>(&into[12]) = m_sector_count;
+    *reinterpret_cast<uint32_t*>(&into[8]) = static_cast<uint32_t>(lba_offset);
+    *reinterpret_cast<uint32_t*>(&into[12]) = static_cast<uint32_t>(m_sector_count);
 }
 
 uint32_t MBR::Partition::sector_count() const noexcept
@@ -77,16 +73,20 @@ void MBR::write_into(DiskImage& image)
     image.write(m_mbr, mbr_size);
 }
 
-void MBR::add_partition(const Partition& partition)
+size_t MBR::add_partition(const Partition& partition)
 {
     size_t partition_offset = partition_base + (m_active_partition * partition_entry_size);
 
-    partition.serialize(&m_mbr[partition_offset], m_disk_geometry, m_active_lba_offset);
+    size_t partition_lba_offset = m_active_lba_offset;
+
+    partition.serialize(&m_mbr[partition_offset], m_disk_geometry, partition_lba_offset);
 
     m_active_lba_offset += partition.sector_count();
+
+    return partition_lba_offset;
 }
 
-bool MBR::validate_mbr()
+void MBR::validate_mbr()
 {
     uint8_t expected_partition_data[mpt_size]{};
 

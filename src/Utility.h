@@ -1,10 +1,5 @@
 #pragma once
 
-#ifdef _MSVC_LANG
-    // No, i'm not gonna use fopen_s
-    #define _CRT_SECURE_NO_WARNINGS
-#endif
-
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -319,16 +314,16 @@ struct disk_geometry
     size_t heads;
     size_t sectors;
 
-    bool over_chs_limit() const noexcept
+    bool within_chs_limit() const noexcept
     {
         if (heads > ((1 << 8) - 1))
-            return true;
+            return false;
         if (sectors > ((1 << 6) - 1))
-            return true;
+            return false;
         if (cylinders > ((1 << 10) - 1))
-            return true;
+            return false;
 
-        return false;
+        return true;
     }
 };
 
