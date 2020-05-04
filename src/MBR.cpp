@@ -65,6 +65,7 @@ MBR::MBR(const std::string& path, const disk_geometry& geometry)
 {
     auto mbr_file = fopen(path.c_str(), "rb");
     READ_EXACTLY(mbr_file, m_mbr, mbr_size);
+    fclose(mbr_file);
     validate_mbr();
 }
 

@@ -102,6 +102,8 @@ void VMDKDiskImage::write_description(const std::string& image_name, const std::
     WRITE_EXACTLY(description_file, ddb_gs.c_str(), ddb_gs.size());
     WRITE_EXACTLY(description_file, ddb_at.c_str(), ddb_at.size());
     WRITE_EXACTLY(description_file, ddb_tv.c_str(), ddb_tv.size());
+
+    fclose(description_file);
 }
 
 disk_geometry VMDKDiskImage::calculate_geometry(size_t size_in_bytes)

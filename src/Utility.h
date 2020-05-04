@@ -345,9 +345,10 @@ inline CHS to_chs(size_t lba, const disk_geometry& geometry)
     return chs;
 }
 
-#define KB 1024
-#define MB 1024 * KB
-#define GB 1024 * MB
+#define KB 1024ull
+#define MB 1024ull * KB
+#define GB 1024ull * MB
+#define TB 1024ull * GB
 
 #define WRITE_EXACTLY(file, data, size) \
     if (fwrite(data, sizeof(uint8_t), size, file) != size) \
