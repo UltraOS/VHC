@@ -42,7 +42,7 @@ int main(int argc, char** argv)
         FAT32 fs(args.get("vbr"), partition_offset, partition_1.sector_count());
 
         for (const auto& file : args.get_list("files"))
-            fs.add_file(file);
+            fs.store_file(file);
 
         fs.write_into(image);
 

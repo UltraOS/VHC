@@ -69,12 +69,13 @@ private:
     size_t m_sectors_per_cluster;
     FileAllocationTable m_fat_table;
     Directory m_root_dir;
+    std::vector<uint8_t> m_data;
 public:
     FAT32(const std::string& vbr_path, size_t lba_offset, size_t sector_count);
 
     void write_into(DiskImage& image) override;
 
-    void add_file(const std::string& path) override;
+    void store_file(const std::string& path) override;
 private:
     void validate_vbr();
 

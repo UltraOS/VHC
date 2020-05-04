@@ -218,11 +218,41 @@ void FAT32::write_into(DiskImage& image)
     // we skip the FS information sector for now
     m_fat_table.write_into(image);
     m_root_dir.write_into(image);
+    image.write(m_data.data(), m_data.size());
 }
 
-void FAT32::add_file(const std::string& path)
+void FAT32::store_file(const std::string& path)
 {
+    auto file = fopen(path.c_str(), "rb");
 
+    if (!file)
+        throw std::runtime_error("Bad path - " + path);
+
+    fseek(file, 0, SEEK_END);
+    size_t file_size = ftell(file);
+    rewind(file);
+
+    uint32_t required_clusters = 1 + ((file_size - 1) / (DiskImage::sector_size * m_sectors_per_cluster));
+
+    uint32_t first_cluster = m_fat_table.allocate(required_clusters);
+
+    if (!first_cluster)
+        throw std::runtime_error("Out of space!");
+
+    size_t byte_offset = m_data.size();
+    m_data.resize(byte_offset + (required_clusters * m_sectors_per_cluster * DiskImage::sector_size));
+
+    READ_EXACTLY(file, m_data.data() + byte_offset, file_size);
+
+    auto file_offset = path.find_last_of("/");
+    if (file_offset == std::string::npos)
+        file_offset = path.find_last_of("\\");
+    auto extension_offset = path.find_last_of(".");
+
+    std::string extension = path.substr(extension_offset + 1);
+    std::string file_name = path.substr(file_offset + 1, extension_offset - file_offset - 1);
+
+    m_root_dir.store_file(file_name, extension, first_cluster, static_cast<uint32_t>(file_size));
 }
 
 void FAT32::validate_vbr()
