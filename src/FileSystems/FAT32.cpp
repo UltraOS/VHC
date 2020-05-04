@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "FAT32.h"
 #include "Utility.h"
 
@@ -101,14 +103,14 @@ uint32_t FAT32::FileAllocationTable::get_entry(uint32_t index) const
     return m_table[index];
 }
 
-std::ostream& FAT32::FileAllocationTable::ls(std::ostream& stream = std::cout) const
+std::ostream& FAT32::FileAllocationTable::ls(std::ostream& stream) const
 {
     stream << "\nFILE ALLOCATION TABLE (FAT32): " << std::endl;
 
     stream << "ENTRY[0] RESERVED" << std::endl;
     stream << "ENTRY[1] RESERVED" << std::endl;
 
-    uint32_t last_entry = m_table.size() + 1;
+    uint32_t last_entry = static_cast<uint32_t>(m_table.size() + 1);
 
     for (uint32_t i = 2; i < m_table.size(); i++)
     {
@@ -134,10 +136,73 @@ std::ostream& operator<<(std::ostream& stream, const FAT32::FileAllocationTable&
     return table.ls(stream);
 }
 
+FAT32::Directory::Directory(size_t size_in_bytes)
+    : m_size(size_in_bytes)
+{
+    if (size_in_bytes % entry_size)
+        throw std::runtime_error("Directory size has to aligned to entry size");
+}
+
+void FAT32::Directory::store_file(const std::string& name, const std::string& extension, uint32_t cluster, uint32_t size)
+{
+    auto entry = Entry();
+
+    auto filename_length = name.size();
+    auto extension_length = extension.size();
+
+    if (filename_length > filename_length_limit)
+        filename_length = filename_length_limit;
+    else if (filename_length < filename_length_limit)
+        memset(entry.filename + filename_length, ' ', filename_length_limit - filename_length);
+
+    if (extension_length > extension_length_limit)
+        extension_length = extension_length_limit;
+    else if (extension_length < extension_length_limit)
+        memset(entry.extension + extension_length, ' ', extension_length_limit - extension_length);
+
+    memcpy(entry.filename, name.c_str(), filename_length);
+    memcpy(entry.extension, extension.c_str(), extension_length);
+
+    entry.attributes = 0b00000100; // a system file
+    // TODO: set time
+    // TODO: set date
+    entry.cluster_high = cluster & 0xFFFF0000;
+    entry.cluster_low =  cluster & 0x0000FFFF;
+    entry.size = size;
+
+    m_entries.emplace_back(entry);
+}
+
+size_t FAT32::Directory::max_entires()
+{
+    return m_size / entry_size;
+}
+
+bool FAT32::Directory::write_into(DiskImage& image)
+{
+    static_assert(sizeof(Entry) == entry_size, "Incorrect Entry size, you might wanna force the alignment");
+
+    for (auto& entry : m_entries)
+        image.write(reinterpret_cast<uint8_t*>(&entry), entry_size);
+
+    if (m_entries.size() != max_entires())
+    {
+        auto free_entries_to_write = max_entires() - m_entries.size();
+
+        uint8_t fake_entry[entry_size]{};
+
+        while (free_entries_to_write--)
+            image.write(fake_entry, entry_size);
+    }
+
+    return true;
+}
+
 FAT32::FAT32(const std::string& vbr_path, size_t lba_offset, size_t sector_count)
     : m_vbr{}, m_sector_count(sector_count),
     m_sectors_per_cluster(pick_sectors_per_cluster()),
-    m_fat_table(sector_count / m_sectors_per_cluster)
+    m_fat_table(sector_count / m_sectors_per_cluster),
+    m_root_dir(m_sectors_per_cluster * DiskImage::sector_size)
 {
     auto vbr_file = fopen(vbr_path.c_str(), "rb");
     READ_EXACTLY(vbr_file, m_vbr, vbr_size);
@@ -148,9 +213,11 @@ FAT32::FAT32(const std::string& vbr_path, size_t lba_offset, size_t sector_count
 
 void FAT32::write_into(DiskImage& image)
 {
+    // set the EBPB in the VBR
     image.write(m_vbr, vbr_size);
-    m_fat_table.write_into(image);
     // we skip the FS information sector for now
+    m_fat_table.write_into(image);
+    m_root_dir.write_into(image);
 }
 
 void FAT32::add_file(const std::string& path)
