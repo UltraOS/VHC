@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <string>
 #include <functional>
+#include <cstring>
+#include <algorithm>
 
 class ArgParser
 {

@@ -218,9 +218,9 @@ void FAT32::construct_ebpb()
     #pragma pack(push, 1)
     #define FORCE_NO_ALIGNMENT
 #elif defined(__GNUC__)
-    #define FORCE_NO_ALIGNMENT __attribute__(packed)
+    #define FORCE_NO_ALIGNMENT __attribute__((packed))
 #else
-    #error Please add your compiler's way of forcing no alignment here
+    #error "Please add your compiler\'s way of forcing no alignment here"
 #endif
     struct EBPB
     {
