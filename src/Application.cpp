@@ -39,7 +39,7 @@ int main(int argc, char** argv)
 
         mbr.write_into(image);
 
-        FAT32 fs(args.get("vbr"), partition_offset, partition_1.sector_count());
+        FAT32 fs(args.get("vbr"), partition_offset, partition_1.sector_count(), image.geometry());
 
         for (const auto& file : args.get_list("files"))
             fs.store_file(file);

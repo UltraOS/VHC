@@ -180,7 +180,7 @@ size_t FAT32::Directory::max_entires()
 
 bool FAT32::Directory::write_into(DiskImage& image)
 {
-    static_assert(sizeof(Entry) == entry_size, "Incorrect Entry size, you might wanna force the alignment");
+    static_assert(sizeof(Entry) == entry_size, "Incorrect Entry size, you might wanna force the alignment of 1 manually");
 
     for (auto& entry : m_entries)
         image.write(reinterpret_cast<uint8_t*>(&entry), entry_size);
@@ -198,11 +198,12 @@ bool FAT32::Directory::write_into(DiskImage& image)
     return true;
 }
 
-FAT32::FAT32(const std::string& vbr_path, size_t lba_offset, size_t sector_count)
-    : m_vbr{}, m_sector_count(sector_count),
+FAT32::FAT32(const std::string& vbr_path, size_t lba_offset, size_t sector_count, const disk_geometry& geometry)
+    : m_lba_offset(lba_offset), m_vbr{}, m_sector_count(sector_count),
     m_sectors_per_cluster(pick_sectors_per_cluster()),
     m_fat_table(sector_count / m_sectors_per_cluster),
-    m_root_dir(m_sectors_per_cluster * DiskImage::sector_size)
+    m_root_dir(m_sectors_per_cluster * DiskImage::sector_size),
+    m_geometry(geometry)
 {
     auto vbr_file = fopen(vbr_path.c_str(), "rb");
     READ_EXACTLY(vbr_file, m_vbr, vbr_size);
@@ -211,8 +212,126 @@ FAT32::FAT32(const std::string& vbr_path, size_t lba_offset, size_t sector_count
     validate_vbr();
 }
 
+void FAT32::construct_ebpb()
+{
+#ifdef _MSVC_LANG
+    #pragma pack(push, 1)
+    #define FORCE_NO_ALIGNMENT
+#elif defined(__GNUC__)
+    #define FORCE_NO_ALIGNMENT __attribute__(packed)
+#else
+    #error Please add your compiler's way of forcing no alignment here
+#endif
+    struct EBPB
+    {
+        // BPB
+        uint16_t bytes_per_sector;
+        uint8_t  sectors_per_cluster;
+        uint16_t reserved_sectors;
+        uint8_t  fat_count;
+        uint16_t max_root_dir_entries;
+        uint16_t unused_1; // total logical sectors for FAT12/16
+        uint8_t  media_descriptor;
+        uint16_t unused_2; // logical sectors per file allocation table for FAT12/16
+        uint16_t sectors_per_track;
+        uint16_t heads;
+        uint32_t hidden_sectors;
+        uint32_t total_logical_sectors;
+
+        // EBPB
+        uint32_t sectors_per_fat;
+        uint16_t drive_description;
+        uint16_t version;
+        uint32_t root_dir_cluster;
+        uint16_t fs_information_sector;
+        uint16_t backup_boot_sectors;
+        uint8_t  reserved_long[12];
+        uint8_t  drive_number;
+        uint8_t  unused_3;
+        uint8_t  signature;
+        uint32_t volume_id;
+        char     volume_label[11];
+        char     filesystem_type[8];
+    } FORCE_NO_ALIGNMENT ebpb;
+#ifdef _MSVC_LANG
+    #pragma pack(pop)
+#endif
+#undef FORCE_NO_ALIGNMENT
+    constexpr size_t expected_ebpb_size = 79;
+
+    static_assert(sizeof(EBPB) == expected_ebpb_size, "Incorrect EBPB size, force no alignment manually for your compiler");
+
+    constexpr size_t ebpb_offset = 11;
+
+    memcpy(&ebpb, m_vbr, expected_ebpb_size);
+
+    ebpb.bytes_per_sector = static_cast<uint16_t>(DiskImage::sector_size);
+    ebpb.sectors_per_cluster = static_cast<uint8_t>(m_sectors_per_cluster);
+
+    // VBR is the only reserved sector
+    ebpb.reserved_sectors = 1;
+
+    ebpb.fat_count = 2;
+
+    // We're FAT32, we can have as many as we want
+    ebpb.max_root_dir_entries = 0;
+
+    // This is too small for us
+    ebpb.unused_1 = 0;
+    ebpb.unused_2 = 0;
+
+    ebpb.media_descriptor = hard_disk_media_descriptor;
+
+    if (m_geometry.within_chs_limit())
+    {
+        ebpb.sectors_per_track = m_geometry.sectors;
+        ebpb.heads = m_geometry.heads;
+    }
+    else
+    {
+        ebpb.sectors_per_track = 0;
+        ebpb.heads = 0;
+    }
+
+    ebpb.hidden_sectors = m_lba_offset;
+    ebpb.total_logical_sectors = m_sector_count;
+
+    ebpb.sectors_per_fat = m_fat_table.size_in_clusters() * m_sectors_per_cluster;
+
+    // I don't think we need this?
+    ebpb.drive_description = 0x0000;
+
+    // 1.0
+    ebpb.version = 0x0100;
+
+    ebpb.root_dir_cluster = 2;
+
+    // we don't have one
+    ebpb.fs_information_sector = 0xFFFF;
+    ebpb.backup_boot_sectors = 0xFFFF;
+
+    memset(ebpb.reserved_long, 0, sizeof(ebpb.reserved_long) / sizeof(uint8_t));
+
+    // fixed disk 1
+    ebpb.drive_number = 0x80;
+
+    ebpb.unused_3 = 0;
+
+    // extended boot signature
+    ebpb.signature = 0x29;
+
+    size_t filesystem_description_size = sizeof(ebpb.filesystem_type) / sizeof(char);
+    char expected_filesystem[] = "FAT32   ";
+    if (memcmp(ebpb.filesystem_type, expected_filesystem, filesystem_description_size))
+        throw std::runtime_error("Unexpected filesystem type in the EBPB - " + std::string(ebpb.filesystem_type, filesystem_description_size));
+
+    memcpy(m_vbr + ebpb_offset, &ebpb, expected_ebpb_size);
+}
+
 void FAT32::write_into(DiskImage& image)
 {
+    construct_ebpb();
+
     // set the EBPB in the VBR
     image.write(m_vbr, vbr_size);
     // we skip the FS information sector for now

@@ -1,7 +1,8 @@
 #pragma once
 #include <string>
-
 #include <vector>
+
+#include "Utility.h"
 #include "FileSystem.h"
 
 class FAT32 final : public FileSystem
@@ -64,20 +65,23 @@ public:
     };
 private:
     static constexpr size_t vbr_size = 512;
+    uint32_t m_lba_offset;
     uint8_t m_vbr[vbr_size];
     size_t m_sector_count;
     size_t m_sectors_per_cluster;
     FileAllocationTable m_fat_table;
     Directory m_root_dir;
+    disk_geometry m_geometry;
     std::vector<uint8_t> m_data;
 public:
-    FAT32(const std::string& vbr_path, size_t lba_offset, size_t sector_count);
+    FAT32(const std::string& vbr_path, size_t lba_offset, size_t sector_count, const disk_geometry& geometry);
 
     void write_into(DiskImage& image) override;
 
     void store_file(const std::string& path) override;
 private:
     void validate_vbr();
+    void construct_ebpb();
 
     size_t pick_sectors_per_cluster();
 };
