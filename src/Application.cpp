@@ -20,7 +20,7 @@ int main(int argc, char** argv)
     try {
         args.parse(argc, argv);
 
-        auto image_size = args.get_uint("size");
+        auto image_size = args.get_uint("size") * MB;
 
         // align for sector size
         image_size = image_size - (image_size % DiskImage::sector_size);

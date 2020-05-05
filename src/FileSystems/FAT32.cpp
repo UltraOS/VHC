@@ -60,7 +60,7 @@ uint32_t FAT32::FileAllocationTable::next_free(uint32_t after_index) const
 
 bool FAT32::FileAllocationTable::has_atleast(uint32_t free_clusters) const
 {
-    uint32_t last_free = 0;
+    uint32_t last_free = 1;
 
     while (free_clusters--)
     {
@@ -90,10 +90,27 @@ void FAT32::FileAllocationTable::ensure_legal_cluster(uint32_t index) const
         throw std::runtime_error("File allocation table overflow");
 }
 
+uint32_t FAT32::FileAllocationTable::size_in_sectors()
+{
+    return 1 + ((size_in_clusters() * sizeof(uint32_t) - 1) / (DiskImage::sector_size));
+}
+
 void FAT32::FileAllocationTable::write_into(DiskImage& image, size_t count)
 {
+    // maybe make a separate function for that
+    size_t bytes_to_pad = (size_in_sectors() * DiskImage::sector_size) - (m_table.size() * sizeof(uint32_t));
+
+    uint8_t* padding = new uint8_t[bytes_to_pad]{};
+
     while (count--)
+    {
         image.write(reinterpret_cast<uint8_t*>(m_table.data()), m_table.size() * sizeof(uint32_t));
+
+        if (bytes_to_pad)
+            image.write(padding, bytes_to_pad);
+    }
+
+    delete[] padding;
 }
 
 uint32_t FAT32::FileAllocationTable::get_entry(uint32_t index) const
@@ -210,6 +227,9 @@ FAT32::FAT32(const std::string& vbr_path, size_t lba_offset, size_t sector_count
     fclose(vbr_file);
 
     validate_vbr();
+
+    // preallocate one cluster for the root directory
+    m_fat_table.allocate(1);
 }
 
 void FAT32::construct_ebpb()
@@ -220,7 +240,7 @@ void FAT32::construct_ebpb()
 #elif defined(__GNUC__)
     #define FORCE_NO_ALIGNMENT __attribute__((packed))
 #else
-    #error "Please add your compiler\'s way of forcing no alignment here"
+    #error "Please add your compiler's way of forcing no alignment here"
 #endif
     struct EBPB
     {
@@ -245,7 +265,7 @@ void FAT32::construct_ebpb()
         uint32_t root_dir_cluster;
         uint16_t fs_information_sector;
         uint16_t backup_boot_sectors;
-        uint8_t  reserved_long[12];
+        uint8_t  reserved[12];
         uint8_t  drive_number;
         uint8_t  unused_3;
         uint8_t  signature;
@@ -263,7 +283,7 @@ void FAT32::construct_ebpb()
 
     constexpr size_t ebpb_offset = 11;
 
-    memcpy(&ebpb, m_vbr, expected_ebpb_size);
+    memcpy(&ebpb, m_vbr + ebpb_offset, expected_ebpb_size);
 
     ebpb.bytes_per_sector = static_cast<uint16_t>(DiskImage::sector_size);
     ebpb.sectors_per_cluster = static_cast<uint8_t>(m_sectors_per_cluster);
@@ -296,7 +316,7 @@ void FAT32::construct_ebpb()
     ebpb.hidden_sectors = m_lba_offset;
     ebpb.total_logical_sectors = m_sector_count;
 
-    ebpb.sectors_per_fat = m_fat_table.size_in_clusters() * m_sectors_per_cluster;
+    ebpb.sectors_per_fat = m_fat_table.size_in_sectors();
 
     // I don't think we need this?
     ebpb.drive_description = 0x0000;
@@ -310,7 +330,7 @@ void FAT32::construct_ebpb()
     ebpb.fs_information_sector = 0xFFFF;
     ebpb.backup_boot_sectors = 0xFFFF;
 
-    memset(ebpb.reserved_long, 0, sizeof(ebpb.reserved_long) / sizeof(uint8_t));
+    memset(ebpb.reserved, 0, sizeof(ebpb.reserved) / sizeof(uint8_t));
 
     // fixed disk 1
     ebpb.drive_number = 0x80;
@@ -334,9 +354,13 @@ void FAT32::write_into(DiskImage& image)
 
     // set the EBPB in the VBR
     image.write(m_vbr, vbr_size);
+
     // we skip the FS information sector for now
+
     m_fat_table.write_into(image);
+
     m_root_dir.write_into(image);
+
     image.write(m_data.data(), m_data.size());
 }
 

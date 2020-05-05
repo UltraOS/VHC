@@ -11,7 +11,7 @@ void MBR::Partition::serialize(uint8_t* into, const disk_geometry& geometry, siz
     if (m_type == Partition::type::FAT32_CHS || geometry.within_chs_limit())
     {
         auto chs_begin = to_chs(lba_offset, geometry);
-        auto chs_end = to_chs(lba_offset, geometry);
+        auto chs_end = to_chs(lba_offset + m_sector_count, geometry);
 
         if (chs_begin.head > ((1 << 8) - 1) || chs_end.head > ((1 << 8) - 1))
             throw std::runtime_error("Head number cannot exceed 2^7");
@@ -83,6 +83,7 @@ size_t MBR::add_partition(const Partition& partition)
     partition.serialize(&m_mbr[partition_offset], m_disk_geometry, partition_lba_offset);
 
     m_active_lba_offset += partition.sector_count();
+    m_active_partition  += 1;
 
     return partition_lba_offset;
 }

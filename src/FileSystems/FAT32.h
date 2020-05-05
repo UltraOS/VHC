@@ -21,6 +21,7 @@ public:
         FileAllocationTable(size_t length_in_clusters);
 
         size_t size_in_clusters();
+        uint32_t size_in_sectors();
 
         uint32_t allocate(uint32_t cluster_count);
         void write_into(DiskImage& image, size_t count = 2);
@@ -29,6 +30,7 @@ public:
         friend std::ostream& operator<<(std::ostream& stream, const FileAllocationTable& table);
 
         uint32_t get_entry(uint32_t index) const;
+
     private:
         uint32_t next_free(uint32_t after_index = 1) const;
         bool has_atleast(uint32_t free_clusters) const;
