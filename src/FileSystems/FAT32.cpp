@@ -92,7 +92,7 @@ void FAT32::FileAllocationTable::ensure_legal_cluster(uint32_t index) const
 
 uint32_t FAT32::FileAllocationTable::size_in_sectors()
 {
-    return 1 + ((size_in_clusters() * sizeof(uint32_t) - 1) / (DiskImage::sector_size));
+    return static_cast<uint32_t>(1 + ((size_in_clusters() * sizeof(uint32_t) - 1) / (DiskImage::sector_size)));
 }
 
 void FAT32::FileAllocationTable::write_into(DiskImage& image, size_t count)
@@ -304,8 +304,8 @@ void FAT32::construct_ebpb()
 
     if (m_geometry.within_chs_limit())
     {
-        ebpb.sectors_per_track = m_geometry.sectors;
-        ebpb.heads = m_geometry.heads;
+        ebpb.sectors_per_track = static_cast<uint16_t>(m_geometry.sectors);
+        ebpb.heads = static_cast<uint16_t>(m_geometry.heads);
     }
     else
     {
@@ -313,8 +313,8 @@ void FAT32::construct_ebpb()
         ebpb.heads = 0;
     }
 
-    ebpb.hidden_sectors = m_lba_offset;
-    ebpb.total_logical_sectors = m_sector_count;
+    ebpb.hidden_sectors = static_cast<uint32_t>(m_lba_offset);
+    ebpb.total_logical_sectors = static_cast<uint32_t>(m_sector_count);
 
     ebpb.sectors_per_fat = m_fat_table.size_in_sectors();
 
@@ -375,9 +375,9 @@ void FAT32::store_file(const std::string& path)
     size_t file_size = ftell(file);
     rewind(file);
 
-    uint32_t required_clusters = 1 + ((file_size - 1) / (DiskImage::sector_size * m_sectors_per_cluster));
+    size_t required_clusters = 1 + ((file_size - 1) / (DiskImage::sector_size * m_sectors_per_cluster));
 
-    uint32_t first_cluster = m_fat_table.allocate(required_clusters);
+    uint32_t first_cluster = m_fat_table.allocate(static_cast<uint32_t>(required_clusters));
 
     if (!first_cluster)
         throw std::runtime_error("Out of space!");

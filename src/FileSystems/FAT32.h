@@ -67,7 +67,7 @@ public:
     };
 private:
     static constexpr size_t vbr_size = 512;
-    uint32_t m_lba_offset;
+    size_t m_lba_offset;
     uint8_t m_vbr[vbr_size];
     size_t m_sector_count;
     size_t m_sectors_per_cluster;

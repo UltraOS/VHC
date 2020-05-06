@@ -87,11 +87,11 @@ void VMDKDiskImage::write_description(const std::string& image_name, const std::
         "#DDB\n\n";
 
     static std::string ddb_vhv = "ddb.virtualHWVersion=\"16\"\n";
-    static std::string ddb_at  = "ddb.adapterType=\"ide\"\n";
-    static std::string ddb_tv  = "ddb.toolsVersion=\"0\"\n";
-    std::string ddb_gc  = "ddb.geometry.cylinders=\"" + std::to_string(geometry().cylinders) + "\"\n";
-    std::string ddb_gh  = "ddb.geometry.heads=\"" + std::to_string(geometry().heads) + "\"\n";
-    std::string ddb_gs  = "ddb.geometry.sectors=\"" + std::to_string(geometry().sectors) + "\"\n";
+    static std::string ddb_at = "ddb.adapterType=\"ide\"\n";
+    static std::string ddb_tv = "ddb.toolsVersion=\"0\"\n";
+    std::string ddb_gc = "ddb.geometry.cylinders=\"" + std::to_string(geometry().cylinders) + "\"\n";
+    std::string ddb_gh = "ddb.geometry.heads=\"" + std::to_string(geometry().heads) + "\"\n";
+    std::string ddb_gs = "ddb.geometry.sectors=\"" + std::to_string(geometry().sectors) + "\"\n";
 
     WRITE_EXACTLY(description_file, VMDK_header.c_str(), VMDK_header.size());
     WRITE_EXACTLY(description_file, extent_description.c_str(), extent_description.size());
@@ -113,9 +113,10 @@ disk_geometry VMDKDiskImage::calculate_geometry(size_t size_in_bytes)
     constexpr size_t vmdk_ide_heads = 16;
     constexpr size_t vmdk_ide_sectors = 63;
     constexpr size_t vmdk_ide_combined = vmdk_ide_heads * vmdk_ide_sectors;
+    constexpr size_t vmdk_sector_size = 512;
 
-    if (size_in_bytes % 512)
-        throw std::runtime_error("Disk size must be aligned to 512 bytes");
+    if (size_in_bytes % vmdk_sector_size)
+        throw std::runtime_error("Disk size must be aligned to sector size");
 
     disk_geometry dg;
     dg.total_sector_count = size_in_bytes / 512;
