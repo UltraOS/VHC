@@ -359,3 +359,18 @@ inline CHS to_chs(size_t lba, const disk_geometry& geometry)
 #define READ_EXACTLY(file, data, size) \
     if (fread(data, sizeof(uint8_t), size, file) != size) \
         throw std::runtime_error("Failed to write " + std::to_string(size) + " bytes to file")
+
+inline std::pair<std::string, std::string> split_filename(std::string filename)
+{
+    std::pair<std::string, std::string> file_to_extension;
+
+    auto file_offset = filename.find_last_of("/");
+    if (file_offset == std::string::npos)
+        file_offset = filename.find_last_of("\\");
+    auto extension_offset = filename.find_last_of(".");
+
+    file_to_extension.first = filename.substr(file_offset + 1, extension_offset - file_offset - 1);
+    file_to_extension.second = filename.substr(extension_offset + 1);
+
+    return file_to_extension;
+}

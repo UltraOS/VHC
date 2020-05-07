@@ -387,15 +387,9 @@ void FAT32::store_file(const std::string& path)
 
     READ_EXACTLY(file, m_data.data() + byte_offset, file_size);
 
-    auto file_offset = path.find_last_of("/");
-    if (file_offset == std::string::npos)
-        file_offset = path.find_last_of("\\");
-    auto extension_offset = path.find_last_of(".");
+    auto name_to_extension = split_filename(path);
 
-    std::string extension = path.substr(extension_offset + 1);
-    std::string file_name = path.substr(file_offset + 1, extension_offset - file_offset - 1);
-
-    m_root_dir.store_file(file_name, extension, first_cluster, static_cast<uint32_t>(file_size));
+    m_root_dir.store_file(name_to_extension.first, name_to_extension.second, first_cluster, static_cast<uint32_t>(file_size));
 }
 
 void FAT32::validate_vbr()
