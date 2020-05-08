@@ -63,9 +63,10 @@ uint32_t MBR::Partition::sector_count() const noexcept
 MBR::MBR(const std::string& path, const disk_geometry& geometry)
     : m_mbr{}, m_active_partition(0), m_disk_geometry(geometry), m_active_lba_offset(1)
 {
-    auto mbr_file = fopen(path.c_str(), "rb");
-    READ_EXACTLY(mbr_file, m_mbr, mbr_size);
-    fclose(mbr_file);
+    AutoFile mbr_file(path, "rb");
+
+    mbr_file.read(m_mbr, mbr_size);
+
     validate_mbr();
 }
 

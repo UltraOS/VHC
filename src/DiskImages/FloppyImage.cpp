@@ -2,16 +2,13 @@
 #include "FloppyImage.h"
 
 FloppyImage::FloppyImage(const std::string& path)
-    : m_file(nullptr), m_bytes_written(0)
+    : m_floppy_file(path, "wb"), m_bytes_written(0)
 {
-    m_file = fopen(path.c_str(), "wb");
-    if (!m_file)
-        throw std::runtime_error("Failed to create file - " + path);
 }
 
-void FloppyImage::write(uint8_t* buffer, size_t size)
+void FloppyImage::write(uint8_t* data, size_t size)
 {
-    WRITE_EXACTLY(m_file, buffer, size);
+    m_floppy_file.write(data, size);
     m_bytes_written += size;
 }
 
@@ -25,10 +22,4 @@ void FloppyImage::finalize()
     uint8_t* padding = new uint8_t[to_pad]();
 
     write(padding, to_pad);
-}
-
-FloppyImage::~FloppyImage()
-{
-    if (m_file)
-        fclose(m_file);
 }

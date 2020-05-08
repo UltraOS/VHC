@@ -8,20 +8,22 @@ void FAT16::RootDirectory::store_file(const std::string& name, const std::string
     auto filename_length = name.size();
     auto extension_length = extension.size();
 
-    if (filename_length > filename_length)
-        filename_length = filename_length;
-    else if (filename_length < filename_length)
-        memset(entry.filename + filename_length, ' ', filename_length - filename_length);
+    if (filename_length > max_filename_length)
+        filename_length = max_filename_length;
+    else if (filename_length < max_filename_length)
+        memset(entry.filename + filename_length, ' ', max_filename_length - filename_length);
 
-    if (extension_length > file_extension_length)
-        extension_length = file_extension_length;
-    else if (extension_length < file_extension_length)
-        memset(entry.extension + extension_length, ' ', file_extension_length - extension_length);
+    if (extension_length > max_file_extension_length)
+        extension_length = max_file_extension_length;
+    else if (extension_length < max_file_extension_length)
+        memset(entry.extension + extension_length, ' ', max_file_extension_length - extension_length);
 
     memcpy(entry.filename, name.c_str(), filename_length);
     memcpy(entry.extension, extension.c_str(), extension_length);
 
-    entry.attributes = 0b00000100; // a system file
+    constexpr uint8_t system_file_attribs = 0b00000100;
+
+    entry.attributes = system_file_attribs; // a system file
     // TODO: set time
     // TODO: set date
     entry.cluster = cluster;
@@ -235,19 +237,11 @@ FAT16::FAT16(const std::string& bootsector_path, const std::vector<std::string>&
 
 void FAT16::set_bootsector(const std::string& path)
 {
-    auto file = fopen(path.c_str(), "rb");
-
-    if (!file)
-        throw std::runtime_error("Bad path - " + path);
+    AutoFile bootsector_file(path, "rb");
 
     m_bootsector.resize(DiskImage::sector_size);
 
-    auto bytes_read = fread(m_bootsector.data(), sizeof(uint8_t), DiskImage::sector_size, file);
-
-    fclose(file);
-
-    if (bytes_read != DiskImage::sector_size)
-        throw std::runtime_error("Bootsector file has to be exactly 512 bytes in size");
+    bootsector_file.read(m_bootsector.data(), DiskImage::sector_size);
 
     if (m_bootsector[510] != 0x55 && m_bootsector[511] != 0xAA)
         throw std::runtime_error("Incorrect bootsector signature, has to end with 0x55AA");
@@ -255,14 +249,9 @@ void FAT16::set_bootsector(const std::string& path)
 
 void FAT16::store_file(const std::string& path)
 {
-    auto file = fopen(path.c_str(), "rb");
+    AutoFile file(path, "rb");
 
-    if (!file)
-        throw std::runtime_error("Bad path - " + path);
-
-    fseek(file, 0, SEEK_END);
-    size_t file_size = ftell(file);
-    rewind(file);
+    size_t file_size = file.size();
 
     uint16_t required_clusters = static_cast<uint16_t>(1 + ((file_size - 1) / DiskImage::sector_size));
 
@@ -274,14 +263,9 @@ void FAT16::store_file(const std::string& path)
     size_t byte_offset = m_raw_data.size();
     m_raw_data.resize(byte_offset + (required_clusters * DiskImage::sector_size));
 
-    size_t bytes_read = fread(m_raw_data.data() + byte_offset, sizeof(uint8_t), file_size, file);
+    file.read(m_raw_data.data() + byte_offset, file_size);
 
-    if (bytes_read != file_size)
-        throw std::runtime_error("Couldn't read all " +
-            std::to_string(file_size) +
-            " bytes from file " + path);
-
-    auto name_to_extension = split_filename(path);
+    auto& name_to_extension = split_filename(path);
 
     m_root_directory.store_file(name_to_extension.first, name_to_extension.second, first_cluster, static_cast<uint32_t>(file_size));
 }

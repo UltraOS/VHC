@@ -5,7 +5,7 @@ VMDKDiskImage::VMDKDiskImage(const std::string& dir_path, const std::string& ima
     : m_final_size(size),
       m_bytes_written(0),
       m_geometry(calculate_geometry(size)),
-      m_disk_file(nullptr)
+      m_disk_file()
 {
     if (image_name.find('.') != std::string::npos)
         throw std::runtime_error("Image name cannot contain dots");
@@ -16,10 +16,7 @@ VMDKDiskImage::VMDKDiskImage(const std::string& dir_path, const std::string& ima
     auto image_file_path = construct_path(dir_path, full_image_name);
     auto image_description_file_path = construct_path(dir_path, full_image_description_name);
 
-    m_disk_file = fopen(image_file_path.c_str(), "wb");
-
-    if (!m_disk_file)
-        throw std::runtime_error("Couldn't create disk file at " + image_file_path);
+    m_disk_file.open(image_file_path, "wb");
 
     write_description(full_image_name, image_description_file_path);
 }
@@ -29,7 +26,8 @@ void VMDKDiskImage::write(uint8_t* data, size_t size)
     if (m_bytes_written + size > m_final_size)
         throw std::runtime_error("Disk size overflow");
 
-    WRITE_EXACTLY(m_disk_file, data, size);
+    m_disk_file.write(data, size);
+
     m_bytes_written += size;
 }
 
@@ -45,30 +43,21 @@ void VMDKDiskImage::finalize()
     if (!padding_size)
         return;
 
-    char padding[sector_size]{};
+    uint8_t padding[sector_size]{};
 
     size_t size_to_write = 0;
 
     while (padding_size)
     {
         size_to_write = padding_size > sector_size ? sector_size : padding_size;
-        WRITE_EXACTLY(m_disk_file, padding, size_to_write);
+        m_disk_file.write(padding, size_to_write);
         padding_size -= size_to_write;
     }
 }
 
-VMDKDiskImage::~VMDKDiskImage()
-{
-    if (m_disk_file)
-        fclose(m_disk_file);
-}
-
 void VMDKDiskImage::write_description(const std::string& image_name, const std::string& path_to_image_description)
 {
-    auto description_file = fopen(path_to_image_description.c_str(), "wb");
-
-    if (!description_file)
-        throw std::runtime_error("Couldn't create image description file at " + path_to_image_description);
+    AutoFile description_file(path_to_image_description, "wb");
 
     static std::string VMDK_header =
         "# Disk DescriptorFile\n"
@@ -93,17 +82,15 @@ void VMDKDiskImage::write_description(const std::string& image_name, const std::
     std::string ddb_gh = "ddb.geometry.heads=\"" + std::to_string(geometry().heads) + "\"\n";
     std::string ddb_gs = "ddb.geometry.sectors=\"" + std::to_string(geometry().sectors) + "\"\n";
 
-    WRITE_EXACTLY(description_file, VMDK_header.c_str(), VMDK_header.size());
-    WRITE_EXACTLY(description_file, extent_description.c_str(), extent_description.size());
-    WRITE_EXACTLY(description_file, disk_database.c_str(), disk_database.size());
-    WRITE_EXACTLY(description_file, ddb_vhv.c_str(), ddb_vhv.size());
-    WRITE_EXACTLY(description_file, ddb_gc.c_str(), ddb_gc.size());
-    WRITE_EXACTLY(description_file, ddb_gh.c_str(), ddb_gh.size());
-    WRITE_EXACTLY(description_file, ddb_gs.c_str(), ddb_gs.size());
-    WRITE_EXACTLY(description_file, ddb_at.c_str(), ddb_at.size());
-    WRITE_EXACTLY(description_file, ddb_tv.c_str(), ddb_tv.size());
-
-    fclose(description_file);
+    description_file.write(VMDK_header);
+    description_file.write(extent_description);
+    description_file.write(disk_database);
+    description_file.write(ddb_vhv);
+    description_file.write(ddb_gc);
+    description_file.write(ddb_gh);
+    description_file.write(ddb_gs);
+    description_file.write(ddb_at);
+    description_file.write(ddb_tv);
 }
 
 disk_geometry VMDKDiskImage::calculate_geometry(size_t size_in_bytes)

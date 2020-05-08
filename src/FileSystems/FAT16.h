@@ -55,8 +55,8 @@ public:
             uint32_t size;
         };
 
-        static constexpr size_t filename_length = 8;
-        static constexpr size_t file_extension_length = 3;
+        static constexpr size_t max_filename_length = 8;
+        static constexpr size_t max_file_extension_length = 3;
         static constexpr size_t rootdir_entry_count = 224;
         static constexpr size_t entry_size = 32;
         std::vector<Entry> m_directory_entries;

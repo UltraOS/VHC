@@ -167,15 +167,15 @@ void FAT32::Directory::store_file(const std::string& name, const std::string& ex
     auto filename_length = name.size();
     auto extension_length = extension.size();
 
-    if (filename_length > filename_length_limit)
-        filename_length = filename_length_limit;
-    else if (filename_length < filename_length_limit)
-        memset(entry.filename + filename_length, ' ', filename_length_limit - filename_length);
+    if (filename_length > max_filename_length)
+        filename_length = max_filename_length;
+    else if (filename_length < max_filename_length)
+        memset(entry.filename + filename_length, ' ', max_filename_length - filename_length);
 
-    if (extension_length > extension_length_limit)
-        extension_length = extension_length_limit;
-    else if (extension_length < extension_length_limit)
-        memset(entry.extension + extension_length, ' ', extension_length_limit - extension_length);
+    if (extension_length > max_file_extension_length)
+        extension_length = max_file_extension_length;
+    else if (extension_length < max_file_extension_length)
+        memset(entry.extension + extension_length, ' ', max_file_extension_length - extension_length);
 
     memcpy(entry.filename, name.c_str(), filename_length);
     memcpy(entry.extension, extension.c_str(), extension_length);
@@ -222,9 +222,8 @@ FAT32::FAT32(const std::string& vbr_path, size_t lba_offset, size_t sector_count
     m_root_dir(m_sectors_per_cluster * DiskImage::sector_size),
     m_geometry(geometry)
 {
-    auto vbr_file = fopen(vbr_path.c_str(), "rb");
-    READ_EXACTLY(vbr_file, m_vbr, vbr_size);
-    fclose(vbr_file);
+    AutoFile file(vbr_path, "rb");
+    file.read(m_vbr, vbr_size);
 
     validate_vbr();
 
@@ -366,14 +365,9 @@ void FAT32::write_into(DiskImage& image)
 
 void FAT32::store_file(const std::string& path)
 {
-    auto file = fopen(path.c_str(), "rb");
+    AutoFile file(path, "rb");
 
-    if (!file)
-        throw std::runtime_error("Bad path - " + path);
-
-    fseek(file, 0, SEEK_END);
-    size_t file_size = ftell(file);
-    rewind(file);
+    size_t file_size = file.size();
 
     size_t required_clusters = 1 + ((file_size - 1) / (DiskImage::sector_size * m_sectors_per_cluster));
 
@@ -385,7 +379,7 @@ void FAT32::store_file(const std::string& path)
     size_t byte_offset = m_data.size();
     m_data.resize(byte_offset + (required_clusters * m_sectors_per_cluster * DiskImage::sector_size));
 
-    READ_EXACTLY(file, m_data.data() + byte_offset, file_size);
+    file.read(m_data.data() + byte_offset, file_size);
 
     auto name_to_extension = split_filename(path);
 

@@ -41,26 +41,26 @@ private:
     std::vector<ArgSpec> m_args;
     std::unordered_map<std::string, std::vector<std::string>> m_parsed_args;
 public:
-    ArgParser& add_param(std::string full_arg, char short_arg, std::string description, bool optional = true)
+    ArgParser& add_param(const std::string& full_arg, char short_arg, const std::string& description, bool optional = true)
     {
-        return add_custom(std::move(full_arg), short_arg, ArgType::param, std::move(description), optional);
+        return add_custom(full_arg, short_arg, ArgType::param, description, optional);
     }
 
-    ArgParser& add_flag(std::string full_arg, char short_arg, std::string description, bool optional = true)
+    ArgParser& add_flag(const std::string& full_arg, char short_arg, const std::string& description, bool optional = true)
     {
-        return add_custom(std::move(full_arg), short_arg, ArgType::flag, std::move(description), optional);
+        return add_custom(full_arg, short_arg, ArgType::flag, description, optional);
     }
 
-    ArgParser& add_list(std::string full_arg, char short_arg, std::string description, bool optional = true)
+    ArgParser& add_list(const std::string& full_arg, char short_arg, const std::string& description, bool optional = true)
     {
-        return add_custom(std::move(full_arg), short_arg, ArgType::list, std::move(description), optional);
+        return add_custom(full_arg, short_arg, ArgType::list, description, optional);
     }
 
-    ArgParser& add_help(std::string full_arg, char short_arg, std::string description, help_callback on_help_requested)
+    ArgParser& add_help(const std::string& full_arg, char short_arg, const std::string& description, help_callback on_help_requested)
     {
         m_help_callback = on_help_requested;
 
-        return add_custom(full_arg, short_arg, ArgType::help, std::move(description), true);
+        return add_custom(full_arg, short_arg, ArgType::help, description, true);
     }
 
     void parse(int argc, char** argv)
@@ -207,9 +207,9 @@ private:
         }
     }
 
-    ArgParser& add_custom(std::string full_arg, char short_arg, ArgType type, std::string description, bool optional)
+    ArgParser& add_custom(const std::string& full_arg, char short_arg, ArgType type, const std::string& description, bool optional)
     {
-        m_args.push_back({ std::move(full_arg), short_arg, type, std::move(description), optional });
+        m_args.push_back({ full_arg, short_arg, type, description, optional });
 
         return *this;
     }
@@ -250,7 +250,7 @@ private:
                                     });
 
         if (arg_itr == m_args.end())
-            throw std::runtime_error("Couldn't find arg " + arg);
+            throw std::runtime_error(std::string("Couldn't find arg ") + arg);
 
         return *arg_itr;
     }
@@ -347,27 +347,99 @@ inline CHS to_chs(size_t lba, const disk_geometry& geometry)
     return chs;
 }
 
-#define KB 1024ull
-#define MB 1024ull * KB
-#define GB 1024ull * MB
-#define TB 1024ull * GB
+#define KB  1024ull
+#define MB (1024ull * KB)
+#define GB (1024ull * MB)
+#define TB (1024ull * GB)
 
-#define WRITE_EXACTLY(file, data, size) \
-    if (fwrite(data, sizeof(uint8_t), size, file) != size) \
-        throw std::runtime_error("Failed to write " + std::to_string(size) + " bytes to file")
+class AutoFile
+{
+private:
+    FILE* m_file;
+public:
+    AutoFile()
+        : m_file(nullptr)
+    {
+    }
 
-#define READ_EXACTLY(file, data, size) \
-    if (fread(data, sizeof(uint8_t), size, file) != size) \
-        throw std::runtime_error("Failed to write " + std::to_string(size) + " bytes to file")
+    AutoFile(const std::string& path, const std::string& mode)
+        : m_file(nullptr)
+    {
+        open(path, mode);
+    }
 
-inline std::pair<std::string, std::string> split_filename(std::string filename)
+    AutoFile(const AutoFile& other_file) = delete;
+    AutoFile& operator=(const AutoFile& other_file) = delete;
+
+    AutoFile(AutoFile&& other_file) noexcept
+        : m_file(other_file.m_file)
+    {
+        other_file.m_file = nullptr;
+    }
+
+    AutoFile& operator=(AutoFile&& other_file) noexcept
+    {
+        std::swap(m_file, other_file.m_file);
+
+        return *this;
+    }
+
+    void open(const std::string& path, const std::string& mode)
+    {
+        if (m_file)
+            fclose(m_file);
+
+        m_file = fopen(path.c_str(), mode.c_str());
+
+        if (!m_file)
+            throw std::runtime_error("Failed to open file: " + path);
+    }
+
+    size_t size()
+    {
+        fseek(m_file, 0, SEEK_END);
+        size_t file_size = ftell(m_file);
+        rewind(m_file);
+        return file_size;
+    }
+
+    void write(const std::string& data)
+    {
+        write(data.c_str(), data.size());
+    }
+
+    void write(const char* data, size_t size)
+    {
+        write(reinterpret_cast<const uint8_t*>(data), size);
+    }
+
+    void write(const uint8_t* data, size_t size)
+    {
+        if (fwrite(data, sizeof(uint8_t), size, m_file) != size)
+            throw std::runtime_error("Failed to write " + std::to_string(size) + " bytes to file");
+    }
+
+    void read(uint8_t* into, size_t size)
+    {
+        if (fread(into, sizeof(uint8_t), size, m_file) != size)
+            throw std::runtime_error("Failed to read " + std::to_string(size) + " bytes from file");
+    }
+
+    ~AutoFile()
+    {
+        if (m_file)
+            fclose(m_file);
+    }
+};
+
+inline std::pair<std::string, std::string> split_filename(const std::string& filename)
 {
     std::pair<std::string, std::string> file_to_extension;
 
-    auto file_offset = filename.find_last_of("/");
+    auto file_offset = filename.find_last_of('/');
     if (file_offset == std::string::npos)
-        file_offset = filename.find_last_of("\\");
-    auto extension_offset = filename.find_last_of(".");
+        file_offset = filename.find_last_of('\\');
+    auto extension_offset = filename.find_last_of('.');
 
     file_to_extension.first = filename.substr(file_offset + 1, extension_offset - file_offset - 1);
     file_to_extension.second = filename.substr(extension_offset + 1);
