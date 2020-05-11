@@ -265,7 +265,7 @@ void FAT16::store_file(const std::string& path)
 
     file.read(m_raw_data.data() + byte_offset, file_size);
 
-    auto& name_to_extension = split_filename(path);
+    auto name_to_extension = split_filename(path);
 
     m_root_directory.store_file(name_to_extension.first, name_to_extension.second, first_cluster, static_cast<uint32_t>(file_size));
 }
