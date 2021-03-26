@@ -326,8 +326,8 @@ void FAT32::construct_ebpb()
     ebpb.root_dir_cluster = 2;
 
     // we don't have one
-    ebpb.fs_information_sector = 0xFFFF;
-    ebpb.backup_boot_sectors = 0xFFFF;
+    ebpb.fs_information_sector = 0x0000;
+    ebpb.backup_boot_sectors = 0x0000;
 
     memset(ebpb.reserved, 0, sizeof(ebpb.reserved) / sizeof(uint8_t));
 
