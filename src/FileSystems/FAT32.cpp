@@ -1,4 +1,5 @@
 #include <iostream>
+#include <ctime>
 
 #include "FAT32.h"
 #include "Utility.h"
@@ -181,9 +182,26 @@ void FAT32::Directory::store_file(const std::string& name, const std::string& ex
     memcpy(entry.extension, extension.c_str(), extension_length);
 
     entry.attributes = 0b00000100; // a system file
-    // TODO: set time
-    // TODO: set date
-    entry.cluster_high = cluster & 0xFFFF0000;
+
+    auto now = std::time(nullptr);
+    auto time = *std::gmtime(&now);
+
+    entry.created_ms = 0;
+
+    uint16_t sec = time.tm_sec / 2;
+    uint16_t min = time.tm_min;
+    uint16_t hr = time.tm_hour;
+    uint16_t yr = time.tm_year - 80;
+    uint16_t mt = time.tm_mon + 1;
+    uint16_t d = time.tm_mday;
+
+    entry.created_time = (hr << 11) | (min << 5) | sec;
+    entry.created_date = (yr << 9) | (mt << 5) | d;
+    entry.last_accessed_date = entry.created_date;
+    entry.last_modified_date = entry.created_date;
+    entry.last_modified_time = entry.created_time;
+
+    entry.cluster_high = (cluster & 0xFFFF0000) >> 16;
     entry.cluster_low =  cluster & 0x0000FFFF;
     entry.size = size;
 

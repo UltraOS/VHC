@@ -46,10 +46,14 @@ public:
             char filename[8];
             char extension[3];
             uint8_t attributes;
-            uint8_t unused[8];
+            uint8_t reserved;
+            uint8_t created_ms;
+            uint16_t created_time;
+            uint16_t created_date;
+            uint16_t last_accessed_date;
             uint16_t cluster_high;
-            uint8_t time[2];
-            uint8_t date[2];
+            uint16_t last_modified_time;
+            uint16_t last_modified_date;
             uint16_t cluster_low;
             uint32_t size;
         };
@@ -57,6 +61,7 @@ public:
         static constexpr size_t max_filename_length = 8;
         static constexpr size_t max_file_extension_length = 3;
         static constexpr size_t entry_size = 32;
+
         std::vector<Entry> m_entries;
         size_t m_size;
     public:
