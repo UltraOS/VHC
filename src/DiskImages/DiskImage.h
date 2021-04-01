@@ -11,6 +11,8 @@ public:
     // disk image type, to do later
     static constexpr size_t sector_size = 512;
 
+    static constexpr size_t partition_alignment = 8;
+
     virtual void write(uint8_t* data, size_t size) = 0;
 
     virtual void finalize() = 0;

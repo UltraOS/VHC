@@ -47,9 +47,10 @@ private:
     uint8_t m_mbr[mbr_size];
     size_t m_active_partition;
     size_t m_active_lba_offset;
+    size_t m_initial_lba_offset;
     disk_geometry m_disk_geometry;
 public:
-    MBR(const std::string& path, const disk_geometry& geometry);
+    MBR(const std::string& path, const disk_geometry& geometry, size_t offset_of_first_partition);
 
     void write_into(DiskImage& image);
 

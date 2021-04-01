@@ -60,8 +60,12 @@ uint32_t MBR::Partition::sector_count() const noexcept
     return m_sector_count;
 }
 
-MBR::MBR(const std::string& path, const disk_geometry& geometry)
-    : m_mbr{}, m_active_partition(0), m_disk_geometry(geometry), m_active_lba_offset(1)
+MBR::MBR(const std::string& path, const disk_geometry& geometry, size_t offset_of_first_partition)
+    : m_mbr{}
+    , m_active_partition(0)
+    , m_disk_geometry(geometry)
+    , m_active_lba_offset(offset_of_first_partition)
+    , m_initial_lba_offset(offset_of_first_partition)
 {
     AutoFile mbr_file(path, "rb");
 
@@ -73,6 +77,11 @@ MBR::MBR(const std::string& path, const disk_geometry& geometry)
 void MBR::write_into(DiskImage& image)
 {
     image.write(m_mbr, mbr_size);
+
+    uint8_t sector[DiskImage::sector_size] {};
+
+    for (size_t i = 1; i < m_initial_lba_offset; ++i)
+        image.write(sector, DiskImage::sector_size);
 }
 
 size_t MBR::add_partition(const Partition& partition)

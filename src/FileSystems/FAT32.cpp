@@ -236,7 +236,7 @@ bool FAT32::Directory::write_into(DiskImage& image)
 FAT32::FAT32(const std::string& vbr_path, size_t lba_offset, size_t sector_count, const disk_geometry& geometry)
     : m_lba_offset(lba_offset), m_vbr{}, m_sector_count(sector_count),
     m_sectors_per_cluster(pick_sectors_per_cluster()),
-    m_fat_table(sector_count / m_sectors_per_cluster),
+    m_fat_table((sector_count - DiskImage::partition_alignment) / m_sectors_per_cluster),
     m_root_dir(m_sectors_per_cluster * DiskImage::sector_size),
     m_geometry(geometry)
 {
@@ -305,8 +305,8 @@ void FAT32::construct_ebpb()
     ebpb.bytes_per_sector = static_cast<uint16_t>(DiskImage::sector_size);
     ebpb.sectors_per_cluster = static_cast<uint8_t>(m_sectors_per_cluster);
 
-    // VBR is the only reserved sector
-    ebpb.reserved_sectors = 1;
+    // reserve enough sectors to keep 4K alignment
+    ebpb.reserved_sectors = 8;
 
     ebpb.fat_count = 2;
 
@@ -373,6 +373,12 @@ void FAT32::write_into(DiskImage& image)
     image.write(m_vbr, vbr_size);
 
     // we skip the FS information sector for now
+
+    uint8_t reserved_sector[DiskImage::sector_size] {};
+
+    // Write the remainder of reserved sectors, should be 1 less because of VBR
+    for (size_t bytes = 0; bytes < (DiskImage::partition_alignment - 1) * DiskImage::sector_size; bytes += DiskImage::sector_size)
+        image.write(reserved_sector, DiskImage::sector_size);
 
     m_fat_table.write_into(image);
 

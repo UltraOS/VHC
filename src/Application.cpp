@@ -29,11 +29,9 @@ int main(int argc, char** argv)
 
         VMDKDiskImage image(args.get("image-dir"), args.get("image-name"), image_size);
 
-        MBR mbr(args.get("mbr"), image.geometry());
+        MBR mbr(args.get("mbr"), image.geometry(), DiskImage::partition_alignment);
 
-        // This partition takes the entire disk space - 1
-        // the -1 being the MBR size
-        MBR::Partition partition_1(image_sector_count - 1);
+        MBR::Partition partition_1(image_sector_count - DiskImage::partition_alignment);
 
         auto partition_offset = mbr.add_partition(partition_1);
 
