@@ -15,13 +15,11 @@ private:
 public:
     class FileAllocationTable
     {
-    private:
-        std::vector<uint32_t> m_table;
     public:
-        FileAllocationTable(size_t length_in_clusters);
+        FileAllocationTable(std::pair<uint32_t, uint32_t> length_in_entries_and_actual_cluster_capacity);
 
-        size_t size_in_clusters();
-        uint32_t size_in_sectors();
+        size_t size_in_clusters() const;
+        uint32_t size_in_sectors() const;
 
         uint32_t allocate(uint32_t cluster_count);
         void write_into(DiskImage& image, size_t count = 2);
@@ -30,12 +28,19 @@ public:
         friend std::ostream& operator<<(std::ostream& stream, const FileAllocationTable& table);
 
         uint32_t get_entry(uint32_t index) const;
+        uint32_t last_allocated() const { return m_last_allocated; }
+        uint32_t free_cluster_count() const { return static_cast<uint32_t>(m_actual_capacity - last_allocated() - 1); }
 
     private:
         uint32_t next_free(uint32_t after_index = 1) const;
         bool has_atleast(uint32_t free_clusters) const;
         void put_entry(uint32_t cluster, uint32_t value);
         void ensure_legal_cluster(uint32_t index) const;
+
+    private:
+        std::vector<uint32_t> m_table;
+        uint32_t m_actual_capacity { 0 };
+        uint32_t m_last_allocated { 0 };
     };
 
     class Directory
@@ -87,6 +92,7 @@ public:
 
     void store_file(const std::string& path) override;
 private:
+    std::pair<uint32_t, uint32_t> calculate_fat_length();
     void validate_vbr();
     void construct_ebpb();
 

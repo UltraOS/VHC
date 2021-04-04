@@ -4,8 +4,9 @@
 #include "FAT32.h"
 #include "Utility.h"
 
-FAT32::FileAllocationTable::FileAllocationTable(size_t length_in_clusters)
-    : m_table(length_in_clusters, 0)
+FAT32::FileAllocationTable::FileAllocationTable(std::pair<uint32_t, uint32_t> length_in_entries_and_actual_cluster_capacity)
+    : m_table(length_in_entries_and_actual_cluster_capacity.first, 0)
+    , m_actual_capacity(length_in_entries_and_actual_cluster_capacity.second)
 {
     m_table[0] = 0xFFFFFFFF;
     *reinterpret_cast<uint8_t*>(&m_table[0]) = hard_disk_media_descriptor;
@@ -13,7 +14,7 @@ FAT32::FileAllocationTable::FileAllocationTable(size_t length_in_clusters)
     m_table[1] = end_of_chain;
 }
 
-size_t FAT32::FileAllocationTable::size_in_clusters()
+size_t FAT32::FileAllocationTable::size_in_clusters() const
 {
     return m_table.size();
 }
@@ -42,6 +43,7 @@ uint32_t FAT32::FileAllocationTable::allocate(uint32_t cluster_count)
     }
 
     put_entry(prev_cluster, end_of_chain);
+    m_last_allocated = prev_cluster;
 
     return first_cluster;
 }
@@ -91,7 +93,7 @@ void FAT32::FileAllocationTable::ensure_legal_cluster(uint32_t index) const
         throw std::runtime_error("File allocation table overflow");
 }
 
-uint32_t FAT32::FileAllocationTable::size_in_sectors()
+uint32_t FAT32::FileAllocationTable::size_in_sectors() const
 {
     return static_cast<uint32_t>(1 + ((size_in_clusters() * sizeof(uint32_t) - 1) / (DiskImage::sector_size)));
 }
@@ -236,7 +238,7 @@ bool FAT32::Directory::write_into(DiskImage& image)
 FAT32::FAT32(const std::string& vbr_path, size_t lba_offset, size_t sector_count, const disk_geometry& geometry)
     : m_lba_offset(lba_offset), m_vbr{}, m_sector_count(sector_count),
     m_sectors_per_cluster(pick_sectors_per_cluster()),
-    m_fat_table((sector_count - DiskImage::partition_alignment) / m_sectors_per_cluster),
+    m_fat_table(calculate_fat_length()),
     m_root_dir(m_sectors_per_cluster * DiskImage::sector_size),
     m_geometry(geometry)
 {
@@ -247,6 +249,28 @@ FAT32::FAT32(const std::string& vbr_path, size_t lba_offset, size_t sector_count
 
     // preallocate one cluster for the root directory
     m_fat_table.allocate(1);
+}
+
+std::pair<uint32_t, uint32_t> FAT32::calculate_fat_length()
+{
+    // 8 reserved sectors before fat tables
+    auto total_free_sectors = static_cast<uint32_t>(m_sector_count) - 8;
+
+    auto bytes_per_fat = (total_free_sectors / static_cast<uint32_t>(m_sectors_per_cluster)) * 4;
+    bytes_per_fat += 4 * 2; // first two clusters are reserved
+
+    auto sectors_per_fat = 1 + ((bytes_per_fat - 1) / static_cast<uint32_t>(DiskImage::sector_size));
+
+    // round up to 4K boundary
+    static constexpr size_t sectors_per_page = 4096 / DiskImage::sector_size;
+    auto rem = sectors_per_fat % sectors_per_page;
+    if (rem)
+        sectors_per_fat += sectors_per_page - rem;
+
+    total_free_sectors -= sectors_per_fat * 2;
+
+    return { sectors_per_fat * static_cast<uint32_t>(DiskImage::sector_size) / 4,
+             total_free_sectors / static_cast<uint32_t>(m_sectors_per_cluster) + 2 };
 }
 
 void FAT32::construct_ebpb()
@@ -341,10 +365,11 @@ void FAT32::construct_ebpb()
     // 1.0
     ebpb.version = 0x0100;
 
+    ebpb.fs_information_sector = 1;
+
     ebpb.root_dir_cluster = 2;
 
     // we don't have one
-    ebpb.fs_information_sector = 0x0000;
     ebpb.backup_boot_sectors = 0x0000;
 
     memset(ebpb.reserved, 0, sizeof(ebpb.reserved) / sizeof(uint8_t));
@@ -372,12 +397,37 @@ void FAT32::write_into(DiskImage& image)
     // set the EBPB in the VBR
     image.write(m_vbr, vbr_size);
 
-    // we skip the FS information sector for now
+    struct FSINFO {
+        char signature_1[4];
+        uint8_t reserved_1[480];
+        char signature_2[4];
+        uint32_t free_cluster_count;
+        uint32_t last_allocater_cluster;
+        uint8_t reserved_2[12];
+        char signature_3[4];
+    };
+
+    static constexpr size_t fsinfo_size = 512;
+    static_assert(sizeof(FSINFO) == fsinfo_size, "incorrect size of FSINFO");
+
+    static constexpr auto* fsinfo_signature_1 = "RRaA";
+    static constexpr auto* fsinfo_signature_2 = "rrAa";
+    static constexpr uint8_t fsinfo_signature_3[] = { 0x00, 0x00, 0x55, 0xAA };
+
+    FSINFO fsinfo {};
+    memcpy(fsinfo.signature_1, fsinfo_signature_1, 4);
+    memcpy(fsinfo.signature_2, fsinfo_signature_2, 4);
+    memcpy(fsinfo.signature_3, fsinfo_signature_3, 4);
+
+    fsinfo.free_cluster_count = m_fat_table.free_cluster_count();
+    fsinfo.last_allocater_cluster = m_fat_table.last_allocated();
+
+    image.write(reinterpret_cast<uint8_t*>(&fsinfo), fsinfo_size);
 
     uint8_t reserved_sector[DiskImage::sector_size] {};
 
-    // Write the remainder of reserved sectors, should be 1 less because of VBR
-    for (size_t bytes = 0; bytes < (DiskImage::partition_alignment - 1) * DiskImage::sector_size; bytes += DiskImage::sector_size)
+    // Write the remainder of reserved sectors, should be 2 less because of VBR and FSINFO
+    for (size_t bytes = 0; bytes < (DiskImage::partition_alignment - 2) * DiskImage::sector_size; bytes += DiskImage::sector_size)
         image.write(reserved_sector, DiskImage::sector_size);
 
     m_fat_table.write_into(image);
