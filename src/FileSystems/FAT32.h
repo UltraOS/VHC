@@ -9,7 +9,7 @@ class FAT32 final : public FileSystem
 {
 private:
     static constexpr uint32_t max_cluster_index = 0x0FFFFFEF;
-    static constexpr uint32_t end_of_chain = 0x0FFFFFF8;
+    static constexpr uint32_t end_of_chain = 0x0FFFFFFF;
     static constexpr uint8_t hard_disk_media_descriptor = 0xF8;
     static constexpr uint32_t free_cluster = 0x00000000;
 public:
@@ -77,6 +77,10 @@ public:
     };
 private:
     static constexpr size_t vbr_size = 512;
+
+    // Has to be exactly 32, otherwise Windows will not mount it
+    static constexpr uint32_t reserved_sector_count = 32;
+
     size_t m_lba_offset;
     uint8_t m_vbr[vbr_size];
     size_t m_sector_count;

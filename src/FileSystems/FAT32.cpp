@@ -146,7 +146,7 @@ std::ostream& FAT32::FileAllocationTable::ls(std::ostream& stream) const
     }
 
     if (last_entry < m_table.size() + 1)
-        stream << "ENTRY[" << last_entry << " - " << m_table.size() << "] EMITTED (empty)" << std::endl;
+        stream << "ENTRY[" << last_entry << " - " << m_table.size() << "] OMITTED (empty)" << std::endl;
 
     return stream;
 }
@@ -160,7 +160,7 @@ FAT32::Directory::Directory(size_t size_in_bytes)
     : m_size(size_in_bytes)
 {
     if (size_in_bytes % entry_size)
-        throw std::runtime_error("Directory size has to aligned to entry size");
+        throw std::runtime_error("Directory size has to be aligned to entry size");
 }
 
 void FAT32::Directory::store_file(const std::string& name, const std::string& extension, uint32_t cluster, uint32_t size)
@@ -182,8 +182,6 @@ void FAT32::Directory::store_file(const std::string& name, const std::string& ex
 
     memcpy(entry.filename, name.c_str(), filename_length);
     memcpy(entry.extension, extension.c_str(), extension_length);
-
-    entry.attributes = 0b00000100; // a system file
 
     auto now = std::time(nullptr);
     auto time = *std::gmtime(&now);
@@ -244,7 +242,6 @@ FAT32::FAT32(const std::string& vbr_path, size_t lba_offset, size_t sector_count
 {
     AutoFile file(vbr_path, "rb");
     file.read(m_vbr, vbr_size);
-
     validate_vbr();
 
     // preallocate one cluster for the root directory
@@ -253,8 +250,7 @@ FAT32::FAT32(const std::string& vbr_path, size_t lba_offset, size_t sector_count
 
 std::pair<uint32_t, uint32_t> FAT32::calculate_fat_length()
 {
-    // 8 reserved sectors before fat tables
-    auto total_free_sectors = static_cast<uint32_t>(m_sector_count) - 8;
+    auto total_free_sectors = static_cast<uint32_t>(m_sector_count) - reserved_sector_count;
 
     auto bytes_per_fat = (total_free_sectors / static_cast<uint32_t>(m_sectors_per_cluster)) * 4;
     bytes_per_fat += 4 * 2; // first two clusters are reserved
@@ -262,7 +258,7 @@ std::pair<uint32_t, uint32_t> FAT32::calculate_fat_length()
     auto sectors_per_fat = 1 + ((bytes_per_fat - 1) / static_cast<uint32_t>(DiskImage::sector_size));
 
     // round up to 4K boundary
-    static constexpr size_t sectors_per_page = 4096 / DiskImage::sector_size;
+    static constexpr uint32_t sectors_per_page = 4096 / DiskImage::sector_size;
     auto rem = sectors_per_fat % sectors_per_page;
     if (rem)
         sectors_per_fat += sectors_per_page - rem;
@@ -301,7 +297,7 @@ void FAT32::construct_ebpb()
 
         // EBPB
         uint32_t sectors_per_fat;
-        uint16_t drive_description;
+        uint16_t ext_flags;
         uint16_t version;
         uint32_t root_dir_cluster;
         uint16_t fs_information_sector;
@@ -328,9 +324,7 @@ void FAT32::construct_ebpb()
 
     ebpb.bytes_per_sector = static_cast<uint16_t>(DiskImage::sector_size);
     ebpb.sectors_per_cluster = static_cast<uint8_t>(m_sectors_per_cluster);
-
-    // reserve enough sectors to keep 4K alignment
-    ebpb.reserved_sectors = 8;
+    ebpb.reserved_sectors = reserved_sector_count;
 
     ebpb.fat_count = 2;
 
@@ -343,31 +337,41 @@ void FAT32::construct_ebpb()
 
     ebpb.media_descriptor = hard_disk_media_descriptor;
 
-    if (m_geometry.within_chs_limit())
-    {
-        ebpb.sectors_per_track = static_cast<uint16_t>(m_geometry.sectors);
-        ebpb.heads = static_cast<uint16_t>(m_geometry.heads);
-    }
-    else
-    {
-        ebpb.sectors_per_track = 0;
-        ebpb.heads = 0;
-    }
+    ebpb.sectors_per_track = 0;
+    ebpb.heads = 0;
 
     ebpb.hidden_sectors = static_cast<uint32_t>(m_lba_offset);
     ebpb.total_logical_sectors = static_cast<uint32_t>(m_sector_count);
 
+    // has to be 0, otherwise Windows won't mount it
+    ebpb.ext_flags = 0;
+
+    // has to be 0, same as above
+    ebpb.version = 0x0000;
+
     ebpb.sectors_per_fat = m_fat_table.size_in_sectors();
-
-    // I don't think we need this?
-    ebpb.drive_description = 0x0000;
-
-    // 1.0
-    ebpb.version = 0x0100;
 
     ebpb.fs_information_sector = 1;
 
     ebpb.root_dir_cluster = 2;
+
+    auto generate_volume_id = []() -> uint32_t
+    {
+        auto now = std::time(nullptr);
+        auto time = *std::gmtime(&now);
+
+        uint16_t dx_1 = ((time.tm_mon + 1) << 8) | time.tm_mday;
+        uint16_t dx_2 = time.tm_sec << 8;
+        uint16_t upper_word = dx_1 + dx_2;
+
+        uint16_t cx_1 = time.tm_year + 80;
+        uint16_t cx_2 = (time.tm_hour << 8) | time.tm_min;
+        uint16_t lower_word = cx_1 + cx_2;
+
+        return (upper_word << 16) | lower_word;
+    };
+
+    ebpb.volume_id = generate_volume_id();
 
     // we don't have one
     ebpb.backup_boot_sectors = 0x0000;
@@ -427,7 +431,7 @@ void FAT32::write_into(DiskImage& image)
     uint8_t reserved_sector[DiskImage::sector_size] {};
 
     // Write the remainder of reserved sectors, should be 2 less because of VBR and FSINFO
-    for (size_t bytes = 0; bytes < (DiskImage::partition_alignment - 2) * DiskImage::sector_size; bytes += DiskImage::sector_size)
+    for (size_t bytes = 0; bytes < (reserved_sector_count - 2) * DiskImage::sector_size; bytes += DiskImage::sector_size)
         image.write(reserved_sector, DiskImage::sector_size);
 
     m_fat_table.write_into(image);
@@ -455,7 +459,11 @@ void FAT32::store_file(const std::string& path)
 
     file.read(m_data.data() + byte_offset, file_size);
 
-    auto name_to_extension = split_filename(path);
+    auto upper_path = path;
+    for (auto& c : upper_path)
+        c = toupper(c);
+
+    auto name_to_extension = split_filename(upper_path);
 
     m_root_dir.store_file(name_to_extension.first, name_to_extension.second, first_cluster, static_cast<uint32_t>(file_size));
 }
