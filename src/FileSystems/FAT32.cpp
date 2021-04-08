@@ -406,7 +406,7 @@ void FAT32::write_into(DiskImage& image)
         uint8_t reserved_1[480];
         char signature_2[4];
         uint32_t free_cluster_count;
-        uint32_t last_allocater_cluster;
+        uint32_t last_allocated_cluster;
         uint8_t reserved_2[12];
         char signature_3[4];
     };
@@ -424,7 +424,7 @@ void FAT32::write_into(DiskImage& image)
     memcpy(fsinfo.signature_3, fsinfo_signature_3, 4);
 
     fsinfo.free_cluster_count = m_fat_table.free_cluster_count();
-    fsinfo.last_allocater_cluster = m_fat_table.last_allocated();
+    fsinfo.last_allocated_cluster = m_fat_table.last_allocated();
 
     image.write(reinterpret_cast<uint8_t*>(&fsinfo), fsinfo_size);
 
