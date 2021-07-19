@@ -441,8 +441,12 @@ inline std::pair<std::string, std::string> split_filename(const std::string& fil
         file_offset = filename.find_last_of('\\');
     auto extension_offset = filename.find_last_of('.');
 
+    bool has_extension = extension_offset != std::string::npos && extension_offset > file_offset;
+
     file_to_extension.first = filename.substr(file_offset + 1, extension_offset - file_offset - 1);
-    file_to_extension.second = filename.substr(extension_offset + 1);
+
+    if (has_extension)
+        file_to_extension.second = filename.substr(extension_offset + 1);
 
     return file_to_extension;
 }
