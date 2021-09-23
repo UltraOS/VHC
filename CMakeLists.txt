@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.6)
-project (VHC)
+
+set(CMAKE_CXX_STANDARD 17)
+
+project(VHC)
+
 file(GLOB_RECURSE VHC_SOURCES "src/*.h" "src/*.cpp")
 add_executable(VHC ${VHC_SOURCES})
 include_directories(src)
