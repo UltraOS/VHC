@@ -450,3 +450,13 @@ inline std::pair<std::string, std::string> split_filename(const std::string& fil
 
     return file_to_extension;
 }
+
+inline std::vector<uint8_t> read_entire(const std::string& path)
+{
+    AutoFile f(path, "rb");
+
+    std::vector<uint8_t> data(f.size());
+    f.read(data.data(), data.size());
+
+    return data;
+}
