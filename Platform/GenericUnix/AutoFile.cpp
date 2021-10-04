@@ -1,10 +1,17 @@
 #include <stdexcept>
 
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "Utilities/AutoFile.h"
 
-static int to_fd(void* handle) { return reinterpret_cast<int>(handle); }
+static int to_fd(void* handle)
+{
+    auto h = reinterpret_cast<long>(handle);
+    return static_cast<int>(h);
+}
 
 void AutoFile::open(std::string_view path, Mode mode)
 {
@@ -12,23 +19,22 @@ void AutoFile::open(std::string_view path, Mode mode)
     flags |= O_CREAT;
     flags |= (mode & Mode::TRUNCATE) ? O_TRUNC : 0;
 
-    mode_t mode = 0;
     if ((mode & Mode::READ) && (mode & Mode::WRITE))
-        mode = O_RDWR;
+        flags |= O_RDWR;
     else if (mode & Mode::READ)
-        mode = O_RDONLY;
+        flags |= O_RDONLY;
     else if (mode & Mode::WRITE)
-        mode = O_WRONLY;
+        flags |= O_WRONLY;
 
-    m_platform_handle = reinterpret_cast<void*>(open(path.data(), flags, mode));
+    m_platform_handle = reinterpret_cast<void*>(::open(path.data(), flags, S_IRWXU));
 
     if (to_fd(m_platform_handle) < 0)
         throw std::runtime_error("failed to open " + std::string(path));
 }
 
-void AutoFile::size()
+size_t AutoFile::size()
 {
-    stat st;
+    struct stat st;
     if (fstat(to_fd(m_platform_handle), &st) < 0)
         throw std::runtime_error("failed to get file size");
 
@@ -71,10 +77,9 @@ size_t AutoFile::skip(size_t bytes)
     return current_offset;
 }
 
-
 void AutoFile::set_size(size_t new_size)
 {
-    if (ftruncate(to_fd(m_platform_handle), offset) < 0)
+    if (ftruncate(to_fd(m_platform_handle), new_size) < 0)
         throw std::runtime_error("failed to set file size");
 }
 
