@@ -18,6 +18,14 @@ void AutoFile::open(std::string_view path, Mode mode)
     disposition |= OPEN_ALWAYS;
     disposition |= (mode & Mode::TRUNCATE) ? TRUNCATE_EXISTING : 0;
 
+    if (mode & Mode::TRUNCATE) {
+        m_platform_handle = CreateFileA(path.data(), access, 0, NULL, disposition, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (m_platform_handle != INVALID_HANDLE_VALUE)
+            return;
+
+        disposition = OPEN_ALWAYS;
+    }
+
     m_platform_handle = CreateFileA(path.data(), access, 0, NULL, disposition, FILE_ATTRIBUTE_NORMAL, NULL);
 
     if (m_platform_handle == INVALID_HANDLE_VALUE)
