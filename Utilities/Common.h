@@ -406,3 +406,70 @@ inline std::vector<uint8_t> read_entire(std::string_view path)
 
     return data;
 }
+
+inline std::string extract_main_value(std::string_view value)
+{
+    auto offset = value.find_first_of(",");
+
+    return std::string(value.begin(), offset == std::string::npos ? value.end() : (value.begin() + offset));
+}
+
+inline bool interpret_boolean(std::string_view value)
+{
+    if (value == "yes" || value == "y" || value == "YES" || value == "Y" ||
+        value == "true" || value == "TRUE" || value == "on" || value == "ON")
+        return true;
+
+    if (value == "no" || value == "n" || value == "NO" || value == "N" ||
+        value == "false" || value == "FALSE" || value == "off" || value == "OFF")
+        return false;
+
+    throw std::runtime_error("couldn't interpret " + std::string(value) + " as boolean");
+}
+
+using additional_options_t = std::unordered_map<std::string, std::string>;
+
+inline additional_options_t parse_options(std::string_view option)
+{
+    additional_options_t additional_options;
+    size_t comma_offset = option.find_first_of(",");
+
+    for (;;) {
+        if (comma_offset == std::string::npos)
+            break;
+
+        auto* begin = option.data() + comma_offset + 1;
+        size_t length = 0;
+
+        size_t next_comma_offset = option.find_first_of(",", comma_offset + 1);
+        if (next_comma_offset == std::string::npos) {
+            length = option.size() - comma_offset - 1;
+        } else {
+            length = next_comma_offset - comma_offset - 1;
+        }
+
+        comma_offset = next_comma_offset;
+
+        std::string_view option_view = { begin, length };
+        auto equality_offset = option_view.find_first_of("=");
+
+        if (equality_offset == std::string::npos || equality_offset == 0)
+            throw std::runtime_error("malformed option value " + std::string(option));
+
+        std::string key = std::string(option_view.begin(), option_view.begin() + equality_offset);
+        std::string value;
+
+        if (option_view[equality_offset + 1] == '"') {
+            if (option_view.back() != '"')
+                throw std::runtime_error("expected \" at the end of option, found " + std::string(option_view.end() - 1, option_view.end()));
+
+            value = std::string(option_view.begin() + equality_offset + 2, option_view.end() - 1);
+        } else {
+            value = std::string(option_view.begin() + equality_offset + 1, option_view.end());
+        }
+
+        additional_options.emplace(std::move(key), std::move(value));
+    }
+
+    return additional_options;
+}
