@@ -14,25 +14,19 @@ void AutoFile::open(std::string_view path, Mode mode)
     access |= (mode & Mode::READ) ? GENERIC_READ : 0;
     access |= (mode & Mode::WRITE) ? GENERIC_WRITE : 0;
 
-    DWORD disposition = 0;
-    disposition |= OPEN_ALWAYS;
-    disposition |= (mode & Mode::TRUNCATE) ? TRUNCATE_EXISTING : 0;
-
     if (mode & Mode::TRUNCATE) {
-        m_platform_handle = CreateFileA(path.data(), access, 0, NULL, disposition, FILE_ATTRIBUTE_NORMAL, NULL);
+        m_platform_handle = CreateFileA(path.data(), access, 0, NULL, TRUNCATE_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         if (m_platform_handle != INVALID_HANDLE_VALUE)
             return;
-
-        disposition = OPEN_ALWAYS;
     }
 
-    m_platform_handle = CreateFileA(path.data(), access, 0, NULL, disposition, FILE_ATTRIBUTE_NORMAL, NULL);
+    m_platform_handle = CreateFileA(path.data(), access, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
     if (m_platform_handle == INVALID_HANDLE_VALUE)
         throw std::runtime_error("failed to open " + std::string(path));
 }
 
-size_t AutoFile::size()
+size_t AutoFile::size() const
 {
     DWORD upper = 0;
     DWORD lower = GetFileSize(m_platform_handle, &upper);
@@ -44,6 +38,11 @@ size_t AutoFile::size()
     static_assert(sizeof(size_t) == 8);
 
     return lower | static_cast<uint64_t>(upper) << 32;
+}
+
+size_t AutoFile::offset() const
+{
+    return SetFilePointer(m_platform_handle, 0, NULL, FILE_CURRENT);
 }
 
 void AutoFile::write(const uint8_t* data, size_t size)
@@ -70,7 +69,7 @@ void AutoFile::read(uint8_t* data, size_t size)
 
 size_t AutoFile::set_offset(size_t offset)
 {
-    size_t current_offset = SetFilePointer(m_platform_handle, 0, NULL, FILE_CURRENT);
+    size_t current_offset = this->offset();
 
     LONG upper_offset = offset >> 32;
     if (SetFilePointer(m_platform_handle, offset, &upper_offset, FILE_BEGIN) == INVALID_SET_FILE_POINTER)

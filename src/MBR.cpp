@@ -1,14 +1,15 @@
 #include "MBR.h"
 
-MBR::Partition::Partition(size_t sector_count, MBR::Partition::status s, MBR::Partition::type t)
-    : m_status(s), m_type(t), m_sector_count(static_cast<uint32_t>(sector_count))
+MBR::Partition::Partition(size_t sector_count, MBR::Partition::Status s, MBR::Partition::Type t)
+    : m_status(s)
+    , m_type(t)
+    , m_sector_count(static_cast<uint32_t>(sector_count))
 {
-
 }
 
-void MBR::Partition::serialize(uint8_t* into, const disk_geometry& geometry, size_t lba_offset) const
+void MBR::Partition::serialize(uint8_t* into, const DiskGeometry& geometry, size_t lba_offset) const
 {
-    if (m_type == Partition::type::FAT32_CHS || geometry.within_chs_limit())
+    if (m_type == Partition::Type::FAT32_CHS || geometry.within_chs_limit())
     {
         auto chs_begin = to_chs(lba_offset, geometry);
         auto chs_end = to_chs(lba_offset + m_sector_count, geometry);
@@ -38,7 +39,7 @@ void MBR::Partition::serialize(uint8_t* into, const disk_geometry& geometry, siz
         into[6] = sector_cylinder_end;
         into[7] = cylinder_end;
     }
-    else if (m_type == Partition::type::FAT32_LBA)
+    else if (m_type == Partition::Type::FAT32_LBA)
     {
         into[1] = 0xFF;
         into[2] = 0xFF;
@@ -51,8 +52,8 @@ void MBR::Partition::serialize(uint8_t* into, const disk_geometry& geometry, siz
     into[0] = static_cast<uint8_t>(m_status);
     into[4] = static_cast<uint8_t>(m_type);
 
-    *reinterpret_cast<uint32_t*>(&into[8]) = static_cast<uint32_t>(lba_offset);
-    *reinterpret_cast<uint32_t*>(&into[12]) = static_cast<uint32_t>(m_sector_count);
+    memcpy(&into[8], &lba_offset, sizeof(uint32_t));
+    memcpy(&into[12], &m_sector_count, sizeof(uint32_t));
 }
 
 uint32_t MBR::Partition::sector_count() const noexcept
@@ -60,14 +61,14 @@ uint32_t MBR::Partition::sector_count() const noexcept
     return m_sector_count;
 }
 
-MBR::MBR(const std::string& path, const disk_geometry& geometry, size_t offset_of_first_partition)
+MBR::MBR(std::string_view path, const DiskGeometry& geometry, size_t offset_of_first_partition)
     : m_mbr{}
     , m_active_partition(0)
-    , m_disk_geometry(geometry)
+    , m_DiskGeometry(geometry)
     , m_active_lba_offset(offset_of_first_partition)
     , m_initial_lba_offset(offset_of_first_partition)
 {
-    AutoFile mbr_file(path, "rb");
+    AutoFile mbr_file(path, AutoFile::Mode::READ);
 
     mbr_file.read(m_mbr, mbr_size);
 
@@ -76,12 +77,7 @@ MBR::MBR(const std::string& path, const disk_geometry& geometry, size_t offset_o
 
 void MBR::write_into(DiskImage& image)
 {
-    image.write(m_mbr, mbr_size);
-
-    uint8_t sector[DiskImage::sector_size] {};
-
-    for (size_t i = 1; i < m_initial_lba_offset; ++i)
-        image.write(sector, DiskImage::sector_size);
+    image.write_at(m_mbr, mbr_size, 0);
 }
 
 size_t MBR::add_partition(const Partition& partition)
@@ -90,7 +86,7 @@ size_t MBR::add_partition(const Partition& partition)
 
     size_t partition_lba_offset = m_active_lba_offset;
 
-    partition.serialize(&m_mbr[partition_offset], m_disk_geometry, partition_lba_offset);
+    partition.serialize(&m_mbr[partition_offset], m_DiskGeometry, partition_lba_offset);
 
     m_active_lba_offset += partition.sector_count();
     m_active_partition  += 1;

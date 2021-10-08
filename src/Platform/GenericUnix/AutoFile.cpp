@@ -32,13 +32,18 @@ void AutoFile::open(std::string_view path, Mode mode)
         throw std::runtime_error("failed to open " + std::string(path));
 }
 
-size_t AutoFile::size()
+size_t AutoFile::size() const
 {
     struct stat st;
     if (fstat(to_fd(m_platform_handle), &st) < 0)
         throw std::runtime_error("failed to get file size");
 
     return st.st_size;
+}
+
+size_t AutoFile::offset() const
+{
+    return lseek(to_fd(m_platform_handle), 0, SEEK_CUR);
 }
 
 void AutoFile::write(const uint8_t* data, size_t size)
@@ -59,7 +64,7 @@ void AutoFile::read(uint8_t* into, size_t size)
 
 size_t AutoFile::set_offset(size_t offset)
 {
-    auto current_offset = lseek(to_fd(m_platform_handle), 0, SEEK_CUR);
+    auto current_offset = this->offset();
 
     if (lseek(to_fd(m_platform_handle), offset, SEEK_SET) < 0)
         throw std::runtime_error("failed to set offset");

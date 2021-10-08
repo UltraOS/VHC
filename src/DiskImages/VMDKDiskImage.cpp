@@ -1,63 +1,68 @@
-#include "Utility.h"
+#include <filesystem>
+
+#include "Utilities/Common.h"
 #include "VMDKDiskImage.h"
 
-VMDKDiskImage::VMDKDiskImage(const std::string& dir_path, const std::string& image_name, size_t size)
-    : m_final_size(size),
-      m_bytes_written(0),
-      m_geometry(calculate_geometry(size)),
-      m_disk_file()
+VMDKDiskImage::VMDKDiskImage(std::string_view dir_path, std::string_view image_name, size_t size)
+    : DiskImage(calculate_geometry(size))
+    , m_final_size(size)
+    , m_disk_file()
 {
     if (image_name.find('.') != std::string::npos)
         throw std::runtime_error("Image name cannot contain dots");
 
-    std::string full_image_name = image_name + "-flat.vmdk";
-    std::string full_image_description_name = image_name + ".vmdk";
+    std::string full_image_name = std::string(image_name) + "-flat.vmdk";
+    std::string full_image_description_name = std::string(image_name) + ".vmdk";
 
-    auto image_file_path = construct_path(dir_path, full_image_name);
-    auto image_description_file_path = construct_path(dir_path, full_image_description_name);
+    auto image_file_path = std::filesystem::path(dir_path) / full_image_name;
+    auto image_description_file_path = std::filesystem::path(dir_path) / full_image_description_name;
 
-    m_disk_file.open(image_file_path, "wb");
+    m_disk_file.open(image_file_path.string(), static_cast<AutoFile::Mode>(AutoFile::Mode::WRITE | AutoFile::Mode::TRUNCATE));
 
-    write_description(full_image_name, image_description_file_path);
+    write_description(full_image_name, image_description_file_path.string());
 }
 
-void VMDKDiskImage::write(uint8_t* data, size_t size)
+void VMDKDiskImage::write_at(const void* data, size_t size, size_t offset)
 {
-    if (m_bytes_written + size > m_final_size)
-        throw std::runtime_error("Disk size overflow");
+    if (offset + size > m_final_size)
+        throw std::runtime_error("disk size overflow");
 
-    m_disk_file.write(data, size);
+    auto previous_offset = m_disk_file.set_offset(offset);
 
-    m_bytes_written += size;
+    m_disk_file.write(reinterpret_cast<const uint8_t*>(data), size);
+    m_disk_file.set_offset(previous_offset);
 }
 
-const disk_geometry& VMDKDiskImage::geometry() const noexcept
+void VMDKDiskImage::write(const void* data, size_t size)
 {
-    return m_geometry;
+    if (m_disk_file.offset() + size > m_final_size)
+        throw std::runtime_error("disk size overflow");
+
+    m_disk_file.write(reinterpret_cast<const uint8_t*>(data), size);
+}
+
+void VMDKDiskImage::set_offset(size_t offset)
+{
+    if (offset >= m_final_size)
+        throw std::runtime_error("offset past end of image");
+
+    m_disk_file.set_offset(offset);
+}
+
+void VMDKDiskImage::skip(size_t bytes)
+{
+    if (m_disk_file.skip(bytes) >= m_final_size)
+        throw std::runtime_error("skipped past the end of image");
 }
 
 void VMDKDiskImage::finalize()
 {
-    auto padding_size = m_final_size - m_bytes_written;
-
-    if (!padding_size)
-        return;
-
-    uint8_t padding[sector_size]{};
-
-    size_t size_to_write = 0;
-
-    while (padding_size)
-    {
-        size_to_write = padding_size > sector_size ? sector_size : padding_size;
-        m_disk_file.write(padding, size_to_write);
-        padding_size -= size_to_write;
-    }
+    m_disk_file.set_size(m_final_size);
 }
 
-void VMDKDiskImage::write_description(const std::string& image_name, const std::string& path_to_image_description)
+void VMDKDiskImage::write_description(std::string_view image_name, std::string_view path_to_image_description)
 {
-    AutoFile description_file(path_to_image_description, "wb");
+    AutoFile description_file(path_to_image_description, static_cast<AutoFile::Mode>(AutoFile::Mode::WRITE | AutoFile::Mode::TRUNCATE));
 
     static std::string VMDK_header =
         "# Disk DescriptorFile\n"
@@ -69,7 +74,10 @@ void VMDKDiskImage::write_description(const std::string& image_name, const std::
         "# Extent description\n";
 
     std::string extent_description = "RW ";
-    extent_description += std::to_string(geometry().total_sector_count) + " FLAT \"" + image_name + "\" 0\n\n";
+    extent_description += std::to_string(geometry().total_sector_count);
+    extent_description += " FLAT \"";
+    extent_description += image_name;
+    extent_description += "\" 0\n\n";
 
     static std::string disk_database =
         "# The Disk Data Base\n"
@@ -93,7 +101,7 @@ void VMDKDiskImage::write_description(const std::string& image_name, const std::
     description_file.write(ddb_tv);
 }
 
-disk_geometry VMDKDiskImage::calculate_geometry(size_t size_in_bytes)
+DiskGeometry VMDKDiskImage::calculate_geometry(size_t size_in_bytes)
 {
     constexpr size_t vmdk_byte_limit = 8455200768;
     constexpr size_t vmdk_cylinder_count_limit = 16383;
@@ -105,7 +113,7 @@ disk_geometry VMDKDiskImage::calculate_geometry(size_t size_in_bytes)
     if (size_in_bytes % vmdk_sector_size)
         throw std::runtime_error("Disk size must be aligned to sector size");
 
-    disk_geometry dg;
+    DiskGeometry dg;
     dg.total_sector_count = size_in_bytes / 512;
     dg.heads = vmdk_ide_heads;
     dg.sectors = vmdk_ide_sectors;
@@ -115,4 +123,9 @@ disk_geometry VMDKDiskImage::calculate_geometry(size_t size_in_bytes)
         dg.cylinders = vmdk_cylinder_count_limit;
 
     return dg;
+}
+
+VMDKDiskImage::~VMDKDiskImage()
+{
+    finalize();
 }

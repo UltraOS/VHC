@@ -16,33 +16,7 @@ class ArgParser
 {
 public:
     using help_callback = std::function<void()>;
-private:
-    enum class ArgType
-    {
-        flag,
-        param,
-        list,
-        help
-    };
 
-    struct ArgSpec
-    {
-        std::string as_full;
-        char        as_short;
-        ArgType     type;
-        std::string description;
-        bool        is_optional;
-
-        bool is_list()  const noexcept { return type == ArgType::list; }
-        bool is_param() const noexcept { return type == ArgType::param; }
-        bool is_flag()  const noexcept { return type == ArgType::flag; }
-        bool is_help()  const noexcept { return type == ArgType::help; }
-    };
-
-    help_callback m_help_callback;
-    std::vector<ArgSpec> m_args;
-    std::unordered_map<std::string, std::vector<std::string>> m_parsed_args;
-public:
     ArgParser& add_param(std::string_view full_arg, char short_arg, std::string_view description, bool optional = true)
     {
         return add_custom(full_arg, short_arg, ArgType::param, description, optional);
@@ -73,7 +47,7 @@ public:
             return;
         }
 
-        ArgSpec* active_spec = nullptr;
+        const ArgSpec* active_spec = nullptr;
 
         for (auto arg_index = 1; arg_index < argc; ++arg_index)
         {
@@ -118,14 +92,14 @@ public:
         ensure_mandatory_args_are_satisfied();
     }
 
-    const std::vector<std::string>& get_list(std::string_view arg)
+    const std::vector<std::string>& get_list(std::string_view arg) const
     {
         ensure_arg_is_parsed(arg);
 
         return m_parsed_args.at(std::string(arg));
     }
 
-    const std::vector<std::string>& get_list_or(std::string_view arg, const std::vector<std::string>& default_value)
+    const std::vector<std::string>& get_list_or(std::string_view arg, const std::vector<std::string>& default_value) const
     {
         if (is_arg_parsed(arg))
             return get_list(arg);
@@ -133,12 +107,12 @@ public:
         return default_value;
     }
 
-    const std::string& get(std::string_view arg)
+    const std::string& get(std::string_view arg) const
     {
         return get_list(arg)[0];
     }
 
-    const std::string& get_or(std::string_view arg, const std::string& default_value)
+    const std::string& get_or(std::string_view arg, const std::string& default_value) const
     {
         if (is_arg_parsed(arg))
             return get(arg);
@@ -146,12 +120,12 @@ public:
         return default_value;
     }
 
-    uint64_t get_uint(std::string_view arg)
+    uint64_t get_uint(std::string_view arg) const
     {
         return std::stoull(get(arg));
     }
 
-    uint64_t get_uint_or(std::string_view arg, uint64_t default_value)
+    uint64_t get_uint_or(std::string_view arg, uint64_t default_value) const
     {
         if (is_arg_parsed(arg))
             return get_uint(arg);
@@ -159,12 +133,12 @@ public:
         return default_value;
     }
 
-    int64_t get_int(std::string_view arg)
+    int64_t get_int(std::string_view arg) const
     {
         return std::stoll(get(arg));
     }
 
-    int64_t get_int_or(std::string_view arg, int64_t default_value)
+    int64_t get_int_or(std::string_view arg, int64_t default_value) const
     {
         if (is_arg_parsed(arg))
             return get_int(arg);
@@ -172,40 +146,40 @@ public:
         return default_value;
     }
 
-    bool is_set(std::string_view arg)
+    bool is_set(std::string_view arg) const
     {
         return is_arg_parsed(arg);
     }
 
-    const std::vector<std::string>& get_list(char arg)
+    const std::vector<std::string>& get_list(char arg) const
     {
         const auto& arg_spec = arg_spec_of(arg);
 
         return get_list(arg_spec.as_full);
     }
 
-    std::string_view get(char arg)
+    std::string_view get(char arg) const
     {
         const auto& arg_spec = arg_spec_of(arg);
 
         return get(arg_spec.as_full);
     }
 
-    uint64_t get_uint(char arg)
+    uint64_t get_uint(char arg) const
     {
         const auto& arg_spec = arg_spec_of(arg);
 
         return get_uint(arg_spec.as_full);
     }
 
-    uint64_t get_int(char arg)
+    uint64_t get_int(char arg) const
     {
         const auto& arg_spec = arg_spec_of(arg);
 
         return get_int(arg_spec.as_full);
     }
 
-    bool is_set(char arg)
+    bool is_set(char arg) const
     {
         const auto& arg_spec = arg_spec_of(arg);
 
@@ -235,7 +209,29 @@ public:
     }
 
 private:
-    void ensure_mandatory_args_are_satisfied()
+    enum class ArgType
+    {
+        flag,
+        param,
+        list,
+        help
+    };
+
+    struct ArgSpec
+    {
+        std::string as_full;
+        char        as_short;
+        ArgType     type;
+        std::string description;
+        bool        is_optional;
+
+        bool is_list()  const noexcept { return type == ArgType::list; }
+        bool is_param() const noexcept { return type == ArgType::param; }
+        bool is_flag()  const noexcept { return type == ArgType::flag; }
+        bool is_help()  const noexcept { return type == ArgType::help; }
+    };
+
+    void ensure_mandatory_args_are_satisfied() const
     {
         for (const auto& arg : m_args)
         {
@@ -261,18 +257,18 @@ private:
         return *this;
     }
 
-    bool is_arg_parsed(std::string_view arg)
+    bool is_arg_parsed(std::string_view arg)  const
     {
         return m_parsed_args.count(std::string(arg));
     }
 
-    void ensure_arg_is_parsed(std::string_view arg)
+    void ensure_arg_is_parsed(std::string_view arg)  const
     {
         if (!is_arg_parsed(arg))
             throw std::runtime_error("Couldn't find argument " + std::string(arg));
     }
 
-    ArgSpec& arg_spec_of(std::string_view arg)
+    const ArgSpec& arg_spec_of(std::string_view arg) const
     {
         auto arg_itr = std::find_if(m_args.begin(),
                                     m_args.end(),
@@ -287,7 +283,7 @@ private:
         return *arg_itr;
     }
 
-    ArgSpec& arg_spec_of(char arg)
+    const ArgSpec& arg_spec_of(char arg) const
     {
         auto arg_itr = std::find_if(m_args.begin(),
                                     m_args.end(),
@@ -337,75 +333,12 @@ private:
             return arg_spec_of(std::string(arg + 2)).as_full;
         }
     }
+
+private:
+    help_callback m_help_callback;
+    std::vector<ArgSpec> m_args;
+    std::unordered_map<std::string, std::vector<std::string>> m_parsed_args;
 };
-
-struct DiskGeometry
-{
-    size_t total_sector_count;
-    size_t cylinders;
-    size_t heads;
-    size_t sectors;
-
-    bool within_chs_limit() const noexcept
-    {
-        if (heads > ((1 << 8) - 1))
-            return false;
-        if (sectors > ((1 << 6) - 1))
-            return false;
-        if (cylinders > ((1 << 10) - 1))
-            return false;
-
-        return true;
-    }
-};
-
-struct CHS
-{
-    size_t cylinder;
-    size_t head;
-    size_t sector;
-};
-
-inline CHS to_chs(size_t lba, const DiskGeometry& geometry)
-{
-    CHS chs;
-
-    chs.head = (lba / geometry.sectors) % geometry.heads;
-    chs.cylinder = (lba / geometry.sectors) / geometry.heads;
-    chs.sector = (lba % geometry.sectors) + 1;
-
-    return chs;
-}
-
-#define KB  1024ull
-#define MB (1024ull * KB)
-#define GB (1024ull * MB)
-#define TB (1024ull * GB)
-
-inline std::pair<std::string, std::string> split_filename(std::string_view filename)
-{
-    std::filesystem::path p(filename);
-
-    if (!p.has_stem())
-        throw std::runtime_error("invalid filename " + std::string(filename));
-
-    std::string extension = p.extension().string();
-
-    // erase the '.'
-    extension.erase(0);
-
-    return { p.stem().string(), std::move(extension) };
-}
-
-inline std::vector<uint8_t> read_entire(std::string_view path)
-{
-    AutoFile f(path, AutoFile::Mode::READ);
-
-    std::vector<uint8_t> data(f.size());
-    f.read(data.data(), data.size());
-
-    return data;
-}
 
 inline std::string extract_main_value(std::string_view value)
 {
@@ -473,3 +406,140 @@ inline additional_options_t parse_options(std::string_view option)
 
     return additional_options;
 }
+
+struct DiskGeometry
+{
+    size_t total_sector_count;
+    size_t cylinders;
+    size_t heads;
+    size_t sectors;
+
+    bool within_chs_limit() const noexcept
+    {
+        if (heads > ((1 << 8) - 1))
+            return false;
+        if (sectors > ((1 << 6) - 1))
+            return false;
+        if (cylinders > ((1 << 10) - 1))
+            return false;
+
+        return true;
+    }
+};
+
+struct CHS
+{
+    size_t cylinder;
+    size_t head;
+    size_t sector;
+};
+
+inline CHS to_chs(size_t lba, const DiskGeometry& geometry)
+{
+    CHS chs;
+
+    chs.head = (lba / geometry.sectors) % geometry.heads;
+    chs.cylinder = (lba / geometry.sectors) / geometry.heads;
+    chs.sector = (lba % geometry.sectors) + 1;
+
+    return chs;
+}
+
+#define KB  1024ull
+#define MB (1024ull * KB)
+#define GB (1024ull * MB)
+#define TB (1024ull * GB)
+
+inline std::vector<uint8_t> read_entire(std::string_view path)
+{
+    AutoFile f(path, AutoFile::Mode::READ);
+
+    std::vector<uint8_t> data(f.size());
+    f.read(data.data(), data.size());
+
+    return data;
+}
+
+template <typename T>
+std::enable_if_t<std::is_integral_v<T>, T> ceiling_divide(T l, T r)
+{
+    return !!l + ((l - !!l) / r);
+}
+
+class Logger {
+public:
+    enum class Level {
+        INFO,
+        WARN,
+        ERROR
+    };
+
+    friend bool operator<(Level l, Level r) { return static_cast<int>(l) < static_cast<int>(r); }
+
+    static Logger& the()
+    {
+        static Logger s_logger;
+
+        return s_logger;
+    }
+
+    void set_level(Level l) { m_level = l; }
+
+    template <typename T>
+    Logger& log(const T& value)
+    {
+        std::cout << value;
+
+        return *this;
+    }
+
+    template <typename... Args>
+    Logger& log(Level l, const Args&... args)
+    {
+        if (l < m_level)
+            return *this;
+
+        switch (l) {
+        case Level::INFO:
+            log("INFO: ");
+            break;
+        case Level::WARN:
+            log("WARNING: ");
+            break;
+        case Level::ERROR:
+            log("ERROR: ");
+            break;
+        }
+
+        (log(args), ...);
+
+        log("\n");
+
+        return *this;
+    }
+
+    template <typename... Args>
+    Logger& info(const Args&... args)
+    {
+        log(Level::INFO, args...);
+        return *this;
+    }
+
+    template <typename... Args>
+    Logger& warning(const Args&... args)
+    {
+        log(Level::WARN, args...);
+        return *this;
+    }
+
+    template <typename... Args>
+    Logger& error(const Args&... args)
+    {
+        log(Level::ERROR, args...);
+        return *this;
+    }
+
+private:
+    Level m_level { Level::WARN };
+};
+

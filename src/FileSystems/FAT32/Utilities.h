@@ -22,7 +22,7 @@ std::pair<size_t, size_t> length_of_name_and_extension(std::string_view file_nam
     size_t extension_length = 0;
 
     if (name_length == 0)
-        extension_length = file_name.size() - (last_dot != std::string::npos);
+        name_length = file_name.size();
     else if (name_length < file_name.size())
         extension_length = file_name.size() - name_length - 1;
 
@@ -33,7 +33,9 @@ std::string generate_short_name(std::string_view long_name)
 {
     std::string short_name;
 
-    auto [name_length, extension_length] = length_of_name_and_extension(long_name);
+    auto* long_name_ptr = long_name.data();
+
+    auto [name_length, extension_length] = length_of_name_and_extension(long_name_ptr);
 
     bool needs_numeric_tail = false;
 
@@ -175,7 +177,7 @@ FilenameInfo analyze_filename(std::string_view name)
 
     FilenameInfo info {};
 
-    info.is_vfat = name_length > short_name_length || extension_length > short_extension_length;
+    info.is_vfat = name_length > short_name_length || extension_length > short_extension_length || name_length == 0;
 
     bool is_name_entirely_upper = false;
     info.is_name_entirely_lower = false;

@@ -6,9 +6,9 @@ class AutoFile
 {
 public:
     enum Mode {
-        READ,
-        WRITE,
-        TRUNCATE
+        READ = 1,
+        WRITE = 2,
+        TRUNCATE = 4
     };
 
     AutoFile()
@@ -19,7 +19,7 @@ public:
     AutoFile(std::string_view path, Mode mode)
         : m_platform_handle(nullptr)
     {
-
+        open(path, mode);
     }
 
     AutoFile(const AutoFile& other_file) = delete;
@@ -40,7 +40,8 @@ public:
 
     void open(std::string_view path, Mode mode);
 
-    size_t size();
+    size_t size() const;
+    size_t offset() const;
 
     void write(std::string_view data)
     {
