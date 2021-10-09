@@ -12,6 +12,14 @@
 
 #include "AutoFile.h"
 
+#if defined(__GNUC__) || defined(__clang__)
+#define PACKED(structure) structure __attribute__((__packed__))
+#elif defined(_MSC_VER)
+#define PACKED(structure) __pragma(pack(push, 1)) structure __pragma(pack(pop))
+#else
+#error unknown compiler
+#endif
+
 class ArgParser
 {
 public:
