@@ -111,7 +111,7 @@ int main(int argc, char** argv)
 
             auto sector = atoll(arg.data() + comma + 1);
             if (sector <= 0 || sector >= image->geometry().total_sector_count)
-                throw std::runtime_error("invalid sector value " + sector);
+                throw std::runtime_error("invalid sector value " + std::to_string(sector));
 
             auto entire_file = read_entire(file_path);
             image->write_at(entire_file.data(), entire_file.size(), sector * DiskImage::sector_size);

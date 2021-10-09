@@ -15,11 +15,11 @@ void MBR::Partition::serialize(uint8_t* into, const DiskGeometry& geometry, size
         auto chs_end = to_chs(lba_offset + m_sector_count, geometry);
 
         if (chs_begin.head > ((1 << 8) - 1) || chs_end.head > ((1 << 8) - 1))
-            throw std::runtime_error("Head number cannot exceed 2^7");
+            throw std::runtime_error("head number cannot exceed 2^7");
         if (chs_begin.sector > ((1 << 6) - 1) || chs_end.sector > ((1 << 6) - 1))
-            throw std::runtime_error("Sector number cannot exceed 2^5");
+            throw std::runtime_error("sector number cannot exceed 2^5");
         if (chs_begin.cylinder > ((1 << 10) - 1) || chs_end.cylinder > ((1 << 10) - 1))
-            throw std::runtime_error("Sector number cannot exceed 2^9");
+            throw std::runtime_error("sector number cannot exceed 2^9");
 
         // CC SSSSSS
         // 00 000000
@@ -99,8 +99,8 @@ void MBR::validate_mbr()
     uint8_t expected_partition_data[mpt_size]{};
 
     if (memcmp(&m_mbr[partition_base], expected_partition_data, mpt_size))
-        throw std::runtime_error("Detected a non-empty MPT");
+        throw std::runtime_error("detected a non-empty MPT");
 
     if (m_mbr[510] != 0x55 && m_mbr[511] != 0xAA)
-        throw std::runtime_error("Incorrect bootsector signature, has to end with 0x55AA");
+        throw std::runtime_error("incorrect bootsector signature, has to end with 0x55AA");
 }

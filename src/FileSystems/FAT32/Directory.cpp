@@ -136,7 +136,7 @@ void Directory::do_store(std::string_view name, const std::vector<uint8_t>& data
     if (contains_name(name))
         throw std::runtime_error(std::string(name) + " already exists");
     if (name.size() > 255)
-        throw std::runtime_error("name is too long");
+        throw std::runtime_error(std::string(name) + " is too long");
 
     auto info = analyze_filename(name);
     info.is_vfat &= m_parent.use_vfat();
@@ -149,7 +149,7 @@ void Directory::do_store(std::string_view name, const std::vector<uint8_t>& data
         short_name = next_short_name(short_name, ok);
 
         if (!ok)
-            throw std::runtime_error("too many short name file collisions");
+            throw std::runtime_error("too many short name file collisions for " + std::string(name));
     }
 
     if (info.is_vfat) {

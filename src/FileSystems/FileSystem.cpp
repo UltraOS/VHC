@@ -15,7 +15,7 @@ std::shared_ptr<FileSystem> FileSystem::create(DiskImage& image, size_t lba_offs
         return std::make_shared<FAT::FAT32>(image, lba_offset, sector_count, options);
     }
 
-    throw std::runtime_error("Unknown filesystem type " + std::string(type));
+    throw std::runtime_error("unknown filesystem type " + std::string(type));
 }
 
 FileSystem::FileSystem(DiskImage& image, size_t lba_offset, size_t sector_count)

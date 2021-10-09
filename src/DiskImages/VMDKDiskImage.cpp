@@ -9,7 +9,7 @@ VMDKDiskImage::VMDKDiskImage(std::string_view dir_path, std::string_view image_n
     , m_disk_file()
 {
     if (image_name.find('.') != std::string::npos)
-        throw std::runtime_error("Image name cannot contain dots");
+        throw std::runtime_error("image name cannot contain dots");
 
     std::string full_image_name = std::string(image_name) + "-flat.vmdk";
     std::string full_image_description_name = std::string(image_name) + ".vmdk";
@@ -111,7 +111,7 @@ DiskGeometry VMDKDiskImage::calculate_geometry(size_t size_in_bytes)
     constexpr size_t vmdk_sector_size = 512;
 
     if (size_in_bytes % vmdk_sector_size)
-        throw std::runtime_error("Disk size must be aligned to sector size");
+        throw std::runtime_error("disk size must be aligned to sector size");
 
     DiskGeometry dg;
     dg.total_sector_count = size_in_bytes / 512;

@@ -83,11 +83,11 @@ void FileAllocationTable::put_entry(uint32_t cluster, uint32_t value)
 void FileAllocationTable::ensure_legal_cluster(uint32_t index) const
 {
     if (index < 2)
-        throw std::runtime_error("First two entries of the file allocation table are reserved");
+        throw std::runtime_error("first two entries of the file allocation table are reserved");
     if (index > max_cluster_index)
-        throw std::runtime_error("Maximum cluster index is 0x0FFFFFEF");
+        throw std::runtime_error("maximum cluster index is 0x0FFFFFEF");
     if (index > m_table.size() - 1)
-        throw std::runtime_error("File allocation table overflow");
+        throw std::runtime_error("file allocation table overflow");
 }
 
 void FileAllocationTable::write_into(DiskImage& image, size_t count)
