@@ -1,6 +1,7 @@
 #include "FAT32.h"
 #include "Utilities/Common.h"
 
+#include "Utilities.h"
 #include "FileAllocationTable.h"
 #include "Directory.h"
 
@@ -65,49 +66,8 @@ std::pair<uint32_t, uint32_t> FAT32::calculate_fat_length()
 
 void FAT32::construct_ebpb()
 {
-#ifdef _MSVC_LANG
-    #pragma pack(push, 1)
-    #define FORCE_NO_ALIGNMENT
-#elif defined(__GNUC__)
-    #define FORCE_NO_ALIGNMENT __attribute__((packed))
-#else
-    #error "Please add your compiler's way of forcing no alignment here"
-#endif
-    struct EBPB
-    {
-        // BPB
-        uint16_t bytes_per_sector;
-        uint8_t  sectors_per_cluster;
-        uint16_t reserved_sectors;
-        uint8_t  fat_count;
-        uint16_t max_root_dir_entries;
-        uint16_t unused_1; // total logical sectors for FAT12/16
-        uint8_t  media_descriptor;
-        uint16_t unused_2; // logical sectors per file allocation table for FAT12/16
-        uint16_t sectors_per_track;
-        uint16_t heads;
-        uint32_t hidden_sectors;
-        uint32_t total_logical_sectors;
+    EBPB ebpb;
 
-        // EBPB
-        uint32_t sectors_per_fat;
-        uint16_t ext_flags;
-        uint16_t version;
-        uint32_t root_dir_cluster;
-        uint16_t fs_information_sector;
-        uint16_t backup_boot_sectors;
-        uint8_t  reserved[12];
-        uint8_t  drive_number;
-        uint8_t  unused_3;
-        uint8_t  signature;
-        uint32_t volume_id;
-        char     volume_label[11];
-        char     filesystem_type[8];
-    } FORCE_NO_ALIGNMENT ebpb;
-#ifdef _MSVC_LANG
-    #pragma pack(pop)
-#endif
-#undef FORCE_NO_ALIGNMENT
     constexpr size_t expected_ebpb_size = 79;
 
     static_assert(sizeof(EBPB) == expected_ebpb_size, "Incorrect EBPB size, force no alignment manually for your compiler");
@@ -126,8 +86,8 @@ void FAT32::construct_ebpb()
     ebpb.max_root_dir_entries = 0;
 
     // This is too small for us
-    ebpb.unused_1 = 0;
-    ebpb.unused_2 = 0;
+    ebpb.sectors_per_fat_legacy = 0;
+    ebpb.total_logical_sectors_legacy = 0;
 
     ebpb.media_descriptor = hard_disk_media_descriptor;
 
@@ -183,7 +143,7 @@ void FAT32::construct_ebpb()
     size_t filesystem_description_size = sizeof(ebpb.filesystem_type) / sizeof(char);
     char expected_filesystem[] = "FAT32   ";
     if (memcmp(ebpb.filesystem_type, expected_filesystem, filesystem_description_size))
-        throw std::runtime_error("Unexpected filesystem type in the EBPB - " + std::string(ebpb.filesystem_type, filesystem_description_size));
+        throw std::runtime_error("unexpected filesystem type in the EBPB - " + std::string(ebpb.filesystem_type, filesystem_description_size));
 
     memcpy(m_vbr + ebpb_offset, &ebpb, expected_ebpb_size);
 }
