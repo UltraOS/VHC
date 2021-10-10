@@ -5,6 +5,9 @@
 #include "FileAllocationTable.h"
 #include "Directory.h"
 
+#include <ctime>
+#include <filesystem>
+
 namespace FAT {
 
 FAT32::FAT32(DiskImage& image, size_t lba_offset, size_t sector_count, const additional_options_t& options)
@@ -20,8 +23,9 @@ FAT32::FAT32(DiskImage& image, size_t lba_offset, size_t sector_count, const add
 
     m_root_dir = std::make_shared<Directory>(*this);
 
-    if (options.count("vbr")) {
-        AutoFile file(options.at("vbr"), AutoFile::Mode::READ);
+    auto vbr_option = options.find("vbr");
+    if (vbr_option != options.end()) {
+        AutoFile file(vbr_option->second, AutoFile::READ);
         file.read(m_vbr, vbr_size);
         validate_vbr();
     } else {
@@ -29,8 +33,9 @@ FAT32::FAT32(DiskImage& image, size_t lba_offset, size_t sector_count, const add
         throw std::runtime_error("FAT32 requires a valid vbr=path option");
     }
 
-    if (options.count("vfat"))
-        m_use_vfat = interpret_boolean(options.at("vfat"));
+    auto vfat_option = options.find("vfat");
+    if (vfat_option != options.end())
+        m_use_vfat = interpret_boolean(vfat_option->second);
 }
 
 FileAllocationTable& FAT32::allocation_table()

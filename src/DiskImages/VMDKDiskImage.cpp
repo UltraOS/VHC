@@ -17,7 +17,7 @@ VMDKDiskImage::VMDKDiskImage(std::string_view dir_path, std::string_view image_n
     auto image_file_path = std::filesystem::path(dir_path) / full_image_name;
     auto image_description_file_path = std::filesystem::path(dir_path) / full_image_description_name;
 
-    m_disk_file.open(image_file_path.string(), static_cast<AutoFile::Mode>(AutoFile::Mode::WRITE | AutoFile::Mode::TRUNCATE));
+    m_disk_file.open(image_file_path.string(), AutoFile::WRITE | AutoFile::TRUNCATE);
 
     write_description(full_image_name, image_description_file_path.string());
 }
@@ -62,7 +62,7 @@ void VMDKDiskImage::finalize()
 
 void VMDKDiskImage::write_description(std::string_view image_name, std::string_view path_to_image_description)
 {
-    AutoFile description_file(path_to_image_description, static_cast<AutoFile::Mode>(AutoFile::Mode::WRITE | AutoFile::Mode::TRUNCATE));
+    AutoFile description_file(path_to_image_description, AutoFile::WRITE | AutoFile::TRUNCATE);
 
     static std::string VMDK_header =
         "# Disk DescriptorFile\n"

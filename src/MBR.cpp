@@ -68,7 +68,7 @@ MBR::MBR(std::string_view path, const DiskGeometry& geometry, size_t offset_of_f
     , m_active_lba_offset(offset_of_first_partition)
     , m_initial_lba_offset(offset_of_first_partition)
 {
-    AutoFile mbr_file(path, AutoFile::Mode::READ);
+    AutoFile mbr_file(path, AutoFile::READ);
 
     mbr_file.read(m_mbr, mbr_size);
 
