@@ -6,6 +6,8 @@
 #include <functional>
 #include <algorithm>
 #include <stdexcept>
+#include <cstring>
+#include <memory>
 
 class ArgParser
 {
