@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string_view>
+#include <vector>
 
 class AutoFile
 {
@@ -10,6 +11,11 @@ public:
         WRITE = 2,
         TRUNCATE = 4
     };
+
+    friend Mode operator|(Mode l, Mode r)
+    {
+        return static_cast<Mode>(static_cast<int>(l) | static_cast<int>(r));
+    }
 
     AutoFile()
         : m_platform_handle(nullptr)
@@ -65,3 +71,13 @@ public:
 private:
     void* m_platform_handle;
 };
+
+inline std::vector<uint8_t> read_entire(std::string_view path)
+{
+    AutoFile f(path, AutoFile::READ);
+
+    std::vector<uint8_t> data(f.size());
+    f.read(data.data(), data.size());
+
+    return data;
+}

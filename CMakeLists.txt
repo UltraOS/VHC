@@ -15,6 +15,7 @@ endif ()
 set(SRC_DIRECTORY "${PROJECT_SOURCE_DIR}/src")
 
 FILE(GLOB VHC_SOURCES "${SRC_DIRECTORY}/*cpp"                                 "${SRC_DIRECTORY}/*h"
+                      "${SRC_DIRECTORY}/Utilities/*cpp"                       "${SRC_DIRECTORY}/Utilities/*h"
                       "${SRC_DIRECTORY}/DiskImages/*cpp"                      "${SRC_DIRECTORY}/DiskImages/*h"
                       "${SRC_DIRECTORY}/FileSystems/*cpp"                     "${SRC_DIRECTORY}/FileSystems/*h"
                       "${SRC_DIRECTORY}/FileSystems/FAT32/*cpp"               "${SRC_DIRECTORY}/FileSystems/FAT32/*h"
@@ -26,7 +27,6 @@ set_target_properties(VHC PROPERTIES OUTPUT_NAME "vhc")
 
 # A bunch of MSVC related stuff because it's annoying
 if (MSVC)
-    target_link_libraries(VHC ntdll.lib)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT VHC)
 endif ()
