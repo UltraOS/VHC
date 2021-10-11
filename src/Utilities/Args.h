@@ -222,10 +222,10 @@ private:
         std::string description;
         bool        is_optional;
 
-        bool is_list()  const noexcept { return type == ArgType::list; }
-        bool is_param() const noexcept { return type == ArgType::param; }
-        bool is_flag()  const noexcept { return type == ArgType::flag; }
-        bool is_help()  const noexcept { return type == ArgType::help; }
+        [[nodiscard]] bool is_list()  const { return type == ArgType::list; }
+        [[nodiscard]] bool is_param() const { return type == ArgType::param; }
+        [[nodiscard]] bool is_flag()  const { return type == ArgType::flag; }
+        [[nodiscard]] bool is_help()  const { return type == ArgType::help; }
     };
 
     void ensure_mandatory_args_are_satisfied() const
@@ -236,7 +236,7 @@ private:
                 continue;
 
             if (!m_parsed_args.count(arg.as_full))
-                throw std::runtime_error(std::string("expected a non-optional argument --") + arg.as_full);
+                throw std::runtime_error("expected a non-optional argument --" + arg.as_full);
         }
     }
 
