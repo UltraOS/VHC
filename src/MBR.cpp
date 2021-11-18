@@ -61,7 +61,7 @@ uint32_t MBR::Partition::sector_count() const noexcept
     return m_sector_count;
 }
 
-MBR::MBR(std::string_view path, const DiskGeometry& geometry, size_t offset_of_first_partition)
+MBR::MBR(const std::string& path, const DiskGeometry& geometry, size_t offset_of_first_partition)
     : m_mbr{}
     , m_active_partition(0)
     , m_DiskGeometry(geometry)

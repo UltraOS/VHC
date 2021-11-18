@@ -60,7 +60,7 @@ void VMDKDiskImage::finalize()
     m_disk_file.set_size(m_final_size);
 }
 
-void VMDKDiskImage::write_description(std::string_view image_name, std::string_view path_to_image_description)
+void VMDKDiskImage::write_description(const std::string& image_name, const std::string& path_to_image_description)
 {
     AutoFile description_file(path_to_image_description, AutoFile::WRITE | AutoFile::TRUNCATE);
 

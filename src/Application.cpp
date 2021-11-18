@@ -107,7 +107,7 @@ int main(int argc, char** argv)
             if (comma == std::string::npos)
                 throw std::runtime_error("invalid store argument format: " + arg);
 
-            std::string_view file_path(arg.data(), comma);
+            std::string file_path(arg.data(), comma);
 
             auto sector = atoll(arg.data() + comma + 1);
             if (sector <= 0 || sector >= image->geometry().total_sector_count)
@@ -116,9 +116,7 @@ int main(int argc, char** argv)
             auto entire_file = read_entire(file_path);
             image->write_at(entire_file.data(), entire_file.size(), sector * DiskImage::sector_size);
         }
-    }
-    catch (const std::exception& ex)
-    {
+    } catch (const std::exception& ex) {
         Logger::the().error(ex.what());
         return 1;
     }

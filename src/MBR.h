@@ -9,7 +9,7 @@ class MBR
 {
 public:
 
-    MBR(std::string_view path, const DiskGeometry& geometry, size_t offset_of_first_partition);
+    MBR(const std::string& path, const DiskGeometry& geometry, size_t offset_of_first_partition);
 
     void write_into(DiskImage& image);
 

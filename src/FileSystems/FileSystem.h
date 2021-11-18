@@ -14,7 +14,7 @@ struct FSObject {
     } type { INVALID };
 
     // path where to store the file on the filesystem
-    std::string_view path;
+    std::string path;
 
     // in-memory file data to store
     // empty for directories and empty files

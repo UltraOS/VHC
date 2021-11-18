@@ -5,7 +5,7 @@
 
 #include "Utilities/AutoFile.h"
 
-void AutoFile::open(std::string_view path, Mode mode)
+void AutoFile::open(const char* path, Mode mode)
 {
     if (m_platform_handle)
         CloseHandle(m_platform_handle);
@@ -15,12 +15,14 @@ void AutoFile::open(std::string_view path, Mode mode)
     access |= (mode & Mode::WRITE) ? GENERIC_WRITE : 0;
 
     if (mode & Mode::TRUNCATE) {
-        m_platform_handle = CreateFileA(path.data(), access, 0, NULL, TRUNCATE_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        m_platform_handle = CreateFileA(path, access, 0, NULL, TRUNCATE_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         if (m_platform_handle != INVALID_HANDLE_VALUE)
             return;
     }
 
-    m_platform_handle = CreateFileA(path.data(), access, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    DWORD creation_despositon = (mode & Mode::WRITE) ? OPEN_ALWAYS : OPEN_EXISTING;
+
+    m_platform_handle = CreateFileA(path, access, 0, NULL, creation_despositon, FILE_ATTRIBUTE_NORMAL, NULL);
 
     if (m_platform_handle == INVALID_HANDLE_VALUE)
         throw std::runtime_error("failed to open " + std::string(path));

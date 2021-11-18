@@ -22,8 +22,13 @@ public:
     {
     }
 
-    AutoFile(std::string_view path, Mode mode)
+    AutoFile(const std::string& path, Mode mode)
         : m_platform_handle(nullptr)
+    {
+        open(path, mode);
+    }
+
+    AutoFile(const char* path, Mode mode)
     {
         open(path, mode);
     }
@@ -44,7 +49,8 @@ public:
         return *this;
     }
 
-    void open(std::string_view path, Mode mode);
+    void open(const char* path, Mode mode);
+    void open(const std::string& path, Mode mode) { return open(path.data(), mode); }
 
     size_t size() const;
     size_t offset() const;
@@ -72,7 +78,7 @@ private:
     void* m_platform_handle;
 };
 
-inline std::vector<uint8_t> read_entire(std::string_view path)
+inline std::vector<uint8_t> read_entire(const std::string& path)
 {
     AutoFile f(path, AutoFile::READ);
 

@@ -20,7 +20,7 @@ public:
     ~VMDKDiskImage();
 
 private:
-    void write_description(std::string_view image_name, std::string_view path_to_image_description);
+    void write_description(const std::string& image_name, const std::string& path_to_image_description);
 
 private:
     size_t m_final_size { 0 };

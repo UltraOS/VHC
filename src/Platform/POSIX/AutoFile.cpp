@@ -13,7 +13,7 @@ static int to_fd(void* handle)
     return static_cast<int>(h);
 }
 
-void AutoFile::open(std::string_view path, Mode mode)
+void AutoFile::open(const char* path, Mode mode)
 {
     int flags = 0;
     flags |= O_CREAT;
@@ -26,7 +26,7 @@ void AutoFile::open(std::string_view path, Mode mode)
     else if (mode & Mode::WRITE)
         flags |= O_WRONLY;
 
-    m_platform_handle = reinterpret_cast<void*>(::open(path.data(), flags, S_IRWXU));
+    m_platform_handle = reinterpret_cast<void*>(::open(path, flags, S_IRWXU));
 
     if (to_fd(m_platform_handle) < 0)
         throw std::runtime_error("failed to open " + std::string(path));
