@@ -150,6 +150,57 @@ struct BlockGroupDescriptor64 : BlockGroupDescritor32 {
 	uint32_t bg_reserved;
 };
 
+struct Inode {
+	uint16_t i_mode;
+	uint16_t i_uid;
+	uint32_t i_size_lo;
+	uint32_t i_atime;
+	uint32_t i_ctime;
+	uint32_t i_mtime;
+	uint32_t i_dtime;
+	uint16_t i_gid;
+	uint16_t i_links_count;
+	uint32_t i_blocks_lo;
+	uint32_t i_flags;
+	uint32_t i_osd1;
+
+	// Means something else in EXT4 and for special files
+	uint32_t i_block[15];
+	uint32_t i_generation;
+	uint32_t i_file_acl_lo;
+
+	union {
+		// EXT4
+		uint32_t i_size_high;
+		
+		// EXT2/3
+		uint32_t i_dir_acl;
+	};
+
+	uint32_t i_obso_faddr;
+	uint32_t i_osd2[3];
+
+	// End of 128 byte inode
+	uint16_t i_extra_isize;
+	uint16_t i_checksum_hi;
+	uint32_t i_ctime_extra;
+	uint32_t i_mtime_extra;
+	uint32_t i_atime_extra;
+	uint32_t i_crtime;
+	uint32_t i_crtime_extra;
+	uint32_t i_version_hi;
+	uint32_t i_projid;
+};
+
+struct DirectoryEntry {
+	uint32_t inode;
+	uint16_t rec_len;
+	uint8_t name_len;
+	uint8_t file_type;
+	char name[255];
+};
+
 static_assert(sizeof(Superblock) == 1024, "Incorrect size of ext superblock");
 static_assert(sizeof(BlockGroupDescritor32) == 32, "Incorrect size of block group descriptor (32 byte)");
 static_assert(sizeof(BlockGroupDescriptor64) == 64, "Incorrect size of block group descriptor (64 byte)");
+static_assert(sizeof(Inode) == 160, "Incorrect size of Inode");
