@@ -121,7 +121,7 @@ struct Superblock {
 	uint32_t s_checksum;
 };
 
-struct BlockGroupDescritor32 {
+struct BlockGroupDescriptor32 {
 	uint32_t bg_block_bitmap_lo;
 	uint32_t bg_inode_bitmap_lo;
 	uint32_t bg_inode_table_lo;
@@ -136,7 +136,7 @@ struct BlockGroupDescritor32 {
 	uint16_t bg_checksum;
 };
 
-struct BlockGroupDescriptor64 : BlockGroupDescritor32 {
+struct BlockGroupDescriptor64 : BlockGroupDescriptor32 {
 	uint32_t bg_block_bitmap_hi;
 	uint32_t bg_inode_bitmap_hi;
 	uint32_t bg_inode_table_hi;
