@@ -20,7 +20,7 @@ public:
     FAT32(DiskImage& image, size_t lba_offset, size_t sector_count, const additional_options_t& options);
 
     void finalize() override;
-    void store(const FSObject&);
+    void store(const FSObject&) override;
 
     [[nodiscard]] FileAllocationTable& allocation_table();
     [[nodiscard]] size_t sectors_per_cluster() const { return m_sectors_per_cluster; }
